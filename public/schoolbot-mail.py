@@ -172,26 +172,53 @@ def autodetect(email):
             "smtp_port": "587", "smtp_sec": "starttls", "user": email, "source": "supposition"}
 
 
+PREF = ["mistral-small", "mistral-nemo", "gemma2:9b", "gemma2", "llama3.2", "mistral"]
+_MODEL = {}
+
+
+def ollama_models():
+    """Modèles installés sur ce PC (aucun mail n'est transmis)."""
+    try:
+        with urllib.request.urlopen((CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/tags", timeout=5) as r:
+            return [m["name"] for m in json.load(r).get("models", [])]
+    except Exception:
+        return []
+
+
+def pick_model():
+    """Le meilleur modèle déjà installé sur ce PC, choisi tout seul."""
+    if _MODEL.get("m"):
+        return _MODEL["m"]
+    got = ollama_models()
+    if not got:
+        return CFG.get("ollama_model") or "mistral"
+    for p in PREF:
+        for g in got:
+            if g == p or g.split(":")[0] == p:
+                _MODEL["m"] = g
+                return g
+    _MODEL["m"] = got[0]
+    return got[0]
+
+
 def ai(system, user, max_tokens=2000):
     if (CFG.get("ai") or "ollama") == "ollama":
+        model = CFG.get("ollama_model") or "auto"
+        if model in ("", "auto"):
+            model = pick_model()
         req = urllib.request.Request(
             (CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/chat",
-            data=json.dumps({"model": CFG.get("ollama_model") or "mistral", "stream": False,
+            data=json.dumps({"model": model, "stream": False,
                              "options": {"num_predict": max_tokens},
                              "messages": [{"role": "system", "content": system},
                                           {"role": "user", "content": user}]}).encode(),
             headers={"content-type": "application/json"})
-        model = CFG.get("ollama_model") or "mistral"
         try:
             with urllib.request.urlopen(req, timeout=300) as r:
                 return json.load(r)["message"]["content"]
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                try:
-                    with urllib.request.urlopen((CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/tags", timeout=5) as r:
-                        names = ", ".join(m["name"] for m in json.load(r).get("models", [])) or "aucun"
-                except Exception:
-                    names = "?"
+                names = ", ".join(ollama_models()) or "aucun"
                 raise RuntimeError("Le modèle '" + model + "' n'est pas (encore) téléchargé dans Ollama. "
                                    "Modèles disponibles sur ce PC : " + names +
                                    ". Corrigez le nom dans ⚙ « Modèle local », ou attendez la fin du téléchargement.")
@@ -367,15 +394,21 @@ const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,f
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
-const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)","model"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+async function fillModels(sel,cur){sel.add(new Option('Automatique — le meilleur modèle installé','auto'));
+ try{const r=await(await fetch('/api/models')).json();
+  for(const m of r.models)sel.add(new Option(m+(m===r.recommended?' — conseillé':''),m))}
+ catch(e){for(const m of['mistral-small','mistral-nemo','mistral','llama3.2'])sel.add(new Option(m,m))}
+ sel.value=(cur&&[...sel.options].some(o=>o.value===cur))?cur:'auto'}
 function wizard(c){c=c||{};app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
  const f=$('#fields');
  for(const[k,t,ty]of F){const w=document.createElement('div');const l=document.createElement('label');l.textContent=t;let i;
   if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
   else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
+  else if(ty==='model'){i=document.createElement('select');fillModels(i,c[k])}
   else{i=document.createElement('input');i.type=ty||'text'}
-  i.id='f_'+k;if(c[k])i.value=c[k];w.append(l,i);f.append(w)}
- if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';if(!c.ollama_model)$('#f_ollama_model').value='mistral';$('#f_email').onblur=guess}
+  i.id='f_'+k;if(ty!=='model'&&c[k])i.value=c[k];w.append(l,i);f.append(w)}
+ if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess}
 async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$('#wst').textContent='Recherche des paramètres…';
  const r=await(await fetch('/api/detect',{method:'POST',body:JSON.stringify({email:e})})).json();if(r.error){$('#wst').textContent=r.error;return}
  for(const k of['user','imap_host','imap_port','imap_sec','smtp_host','smtp_port','smtp_sec'])if(r[k])$('#f_'+k).value=r[k];
@@ -439,6 +472,8 @@ class H(BaseHTTPRequestHandler):
             safe = {k: v for k, v in CFG.items() if k not in ("pass", "api_key")}
             return self.reply({"configured": bool(CFG.get("imap_host") and CFG.get("pass")), "cfg": safe,
                                "has_key": (CFG.get("ai") or "ollama") == "ollama" or bool(CFG.get("api_key") or E("ANTHROPIC_API_KEY"))})
+        if self.path == "/api/models":
+            return self.reply({"models": ollama_models(), "recommended": pick_model()})
         if self.path == "/api/mails":
             try:
                 ms = fetch_today()
