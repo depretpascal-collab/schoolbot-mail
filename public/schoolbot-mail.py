@@ -218,12 +218,48 @@ def classify(mails):
         pass
 
 
+def split_thread(body):
+    """Sépare le nouveau message de l'historique cité (lignes '>' ou 'Le ... a écrit :')."""
+    lines = body.splitlines()
+    for i, l in enumerate(lines):
+        s = l.strip()
+        if s.startswith(">") or re.match(r"(?i)^(le .{5,120}a écrit|on .{5,120}wrote|-{3,}\s*(original|message))", s) \
+                or re.match(r"(?i)^\*?(from|de)\s*:\*?", s):
+            new = "\n".join(lines[:i]).strip()
+            old = "\n".join(re.sub(r"^\s*>+ ?", "", x) for x in lines[i:]).strip()
+            return new or body.strip(), old
+    return body.strip(), ""
+
+
 def draft(m):
-    sys_ = ("Tu rédiges des réponses d'email professionnelles, claires et concises, dans la langue du mail "
-            "reçu. Réponds UNIQUEMENT avec le corps de la réponse (formule d'appel et de politesse incluses), "
-            "sans objet. Si une information manque, laisse un [crochet] à compléter.")
-    out = ai(sys_, f"De : {m['from']}\nObjet : {m['subject']}\n\n{m['body']}", 1200).strip()
-    return out + (f"\n\n{CFG['signature']}" if CFG.get("signature") else "")
+    me = CFG.get("email", "")
+    sig = CFG.get("signature", "").strip()
+    sender_name, sender_addr = parseaddr(m["from"])
+    new, history = split_thread(m["body"])
+    today = datetime.date.today().strftime("%A %d/%m/%Y")
+    sys_ = (
+        "Tu es l'assistant de l'UTILISATEUR et tu rédiges SA réponse à un email. "
+        f"L'UTILISATEUR est le propriétaire de la boîte {me}"
+        + (f", qui signe : « {sig.splitlines()[0]} »" if sig else "") + ". "
+        f"L'INTERLOCUTEUR est l'expéditeur du dernier message : {sender_name or sender_addr} <{sender_addr}>. "
+        "Règles strictes : tu écris AU NOM DE L'UTILISATEUR, À L'INTERLOCUTEUR ; la formule d'appel s'adresse "
+        "à l'interlocuteur (jamais à l'utilisateur) ; ne signe jamais du nom de l'interlocuteur et ne reprends "
+        "jamais sa signature. Réponds au DERNIER message ; l'historique sert uniquement de contexte "
+        "(ce qui a déjà été proposé, accepté ou demandé, et par qui). Ne réaffirme pas ce que l'interlocuteur a "
+        "dit comme si c'était l'utilisateur. Réponds aux questions posées ; si une information manque "
+        "(ex. un choix que seul l'utilisateur peut faire), laisse un [crochet] à compléter. "
+        "Langue du mail reçu, ton professionnel, concis. Réponds UNIQUEMENT avec le corps de la réponse "
+        "(formule d'appel et formule de politesse), SANS signature et sans objet."
+    )
+    user = (f"Date du jour : {today}\nObjet : {m['subject']}\n\n"
+            f"=== DERNIER MESSAGE, reçu le {m['date']}, écrit par l'INTERLOCUTEUR ({sender_name or sender_addr}) ===\n"
+            f"{new}\n\n"
+            + (f"=== HISTORIQUE PRÉCÉDENT (messages plus anciens, du plus récent au plus ancien ; "
+               f"les messages de {me} sont ceux de l'UTILISATEUR) ===\n{history[:4000]}\n" if history else ""))
+    out = ai(sys_, user, 1200).strip()
+    if sender_name and sender_name.split()[-1].lower() in out.lower().splitlines()[-1].lower():
+        out = "\n".join(out.splitlines()[:-1]).strip()  # retire une signature erronée de l'interlocuteur
+    return out + (f"\n\n{sig}" if sig else "")
 
 
 def send(p):
