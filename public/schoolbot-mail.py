@@ -108,7 +108,7 @@ def fetch_today(limit=60):
             "id": mid, "from": dh(msg["From"]), "subject": dh(msg["Subject"]) or "(sans objet)",
             "date": msg["Date"] or "", "body": body_of(msg)[:6000],
             "reply_to": parseaddr(msg["Reply-To"] or msg["From"])[1],
-            "message_id": msg["Message-ID"] or "", "category": "a_lire", "summary": "",
+            "message_id": msg["Message-ID"] or "", "category": "info", "summary": "",
         })
     M.logout()
     return out
