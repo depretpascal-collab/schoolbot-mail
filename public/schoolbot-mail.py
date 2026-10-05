@@ -4,7 +4,7 @@
 Au premier lancement, un assistant demande les paramètres IMAP/SMTP et la clé API
 (stockés localement dans ~/.mailpilot/config.json). Détection automatique des serveurs à partir de l'adresse.
 IA : locale via Ollama (recommandé, les mails ne quittent pas le PC) ou Claude (clé API, ANTHROPIC_API_KEY).
-Lancer : python mailpilot.py  puis ouvrir http://127.0.0.1:8765
+Lancer : double-clic sur SchoolBot Mail (ou python schoolbot-mail.py)
 """
 import os, re, json, imaplib, smtplib, ssl, urllib.request, urllib.error, datetime, html
 from email import message_from_bytes
@@ -417,7 +417,14 @@ const vals=()=>Object.fromEntries(F.map(([k])=>[k,$('#f_'+k).value]));
 async function testIt(){$('#wst').textContent='Test en cours…';const r=await(await fetch('/api/test',{method:'POST',body:JSON.stringify(vals())})).json();$('#wst').textContent='Réception : '+r.imap+' · Envoi : '+r.smtp}
 async function saveIt(){await fetch('/api/config',{method:'POST',body:JSON.stringify(vals())});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
-async function load(){const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';if(!c.configured||!c.has_key){wizard(c.cfg);return}
+async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.stage==='ready')return true;
+ app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2>Préparation de votre assistant</h2><p id="sm">Une seule fois : SchoolBot Mail installe son intelligence artificielle sur cet ordinateur. Vos mails ne le quitteront jamais. Comptez 10 à 20 minutes.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
+ s=await(await fetch('/api/setup',{method:'POST',body:'{}'})).json();
+ while(s.stage!=='ready'){$('#bar').style.width=(s.pct||1)+'%';$('#cnt').textContent=s.msg||'';
+  if(s.stage==='error'){$('#cnt').innerHTML=esc(s.msg)+' <button onclick="load()">Réessayer</button>';return false}
+  await new Promise(r=>setTimeout(r,1000));s=await(await fetch('/api/setup')).json()}
+ return true}
+async function load(){if(!await setupScreen())return;const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';if(!c.configured||!c.has_key){wizard(c.cfg);return}
  app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2 id="t">Je lis vos mails</h2><p id="s">Un par un. Qui écrit, pourquoi, et ce que ça demande de vous.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  let p=0;const tick=setInterval(()=>{p+=(92-p)*0.03;$('#bar').style.width=p+'%'},300);
  const phr=['Je lis les sujets et les expéditeurs…','Je repère ce qui est urgent…','Je classe par catégorie…','Je résume chaque mail…'];let k=0;const pt=setInterval(()=>{$('#s').textContent=phr[k++%phr.length]},2600);
@@ -454,6 +461,136 @@ load();
 </script></html>"""
 
 
+# ---------- Installation automatique de l'IA locale (aucune commande à taper) ----------
+import sys, threading, subprocess, platform, tempfile, time, shutil, zipfile
+SETUP = {"stage": "idle", "pct": 0, "msg": ""}
+IS_WIN, IS_MAC = os.name == "nt", sys.platform == "darwin"
+
+
+def ram_gb():
+    try:
+        if IS_WIN:
+            import ctypes
+            class M(ctypes.Structure):
+                _fields_ = [("l", ctypes.c_ulong), ("m", ctypes.c_ulong), ("t", ctypes.c_ulonglong)] + [(f"x{i}", ctypes.c_ulonglong) for i in range(6)]
+            m = M(); m.l = ctypes.sizeof(M); ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return m.t / 2**30
+        if IS_MAC:
+            return int(subprocess.check_output(["sysctl", "-n", "hw.memsize"])) / 2**30
+        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
+    except Exception:
+        return 8
+
+
+def model_for_pc():
+    g = ram_gb()
+    return "mistral-small" if g >= 30 else "mistral-nemo" if g >= 15 else "llama3.2"
+
+
+def ollama_up():
+    try:
+        urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=3); return True
+    except Exception:
+        return False
+
+
+def ollama_exe():
+    cands = [shutil.which("ollama") or ""]
+    if IS_WIN:
+        cands.append(os.path.join(E("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe"))
+    if IS_MAC:
+        cands += [os.path.expanduser("~/Applications/Ollama.app/Contents/Resources/ollama"), "/Applications/Ollama.app/Contents/Resources/ollama"]
+    return next((c for c in cands if c and os.path.exists(c)), None)
+
+
+def download(url, dest, lo, hi, msg):
+    with urllib.request.urlopen(url, timeout=30) as r, open(dest, "wb") as f:
+        tot, n = int(r.headers.get("Content-Length") or 0), 0
+        while True:
+            b = r.read(1 << 20)
+            if not b: break
+            f.write(b); n += len(b)
+            if tot: SETUP.update(pct=lo + (hi - lo) * n / tot, msg=f"{msg} ({n >> 20} / {tot >> 20} Mo)")
+
+
+def start_ollama(exe):
+    flags = 0x08000000 if IS_WIN else 0  # pas de fenêtre noire
+    subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
+    for _ in range(40):
+        if ollama_up(): return True
+        time.sleep(1)
+    return False
+
+
+def run_setup():
+    try:
+        SETUP.update(stage="engine", pct=2, msg="Vérification du moteur d'IA…")
+        if not ollama_up():
+            exe = ollama_exe()
+            if not exe:
+                tmp = tempfile.mkdtemp()
+                if IS_WIN:
+                    f = os.path.join(tmp, "OllamaSetup.exe")
+                    download("https://ollama.com/download/OllamaSetup.exe", f, 2, 25, "Téléchargement du moteur d'IA")
+                    SETUP.update(pct=26, msg="Installation du moteur d'IA…")
+                    subprocess.run([f, "/VERYSILENT", "/NORESTART", "/SUPPRESSMSGBOXES"], creationflags=0x08000000)
+                elif IS_MAC:
+                    f = os.path.join(tmp, "Ollama.zip")
+                    download("https://ollama.com/download/Ollama-darwin.zip", f, 2, 25, "Téléchargement du moteur d'IA")
+                    apps = os.path.expanduser("~/Applications"); os.makedirs(apps, exist_ok=True)
+                    subprocess.run(["ditto", "-x", "-k", f, apps])
+                else:
+                    raise RuntimeError("Installez Ollama depuis ollama.com")
+                exe = ollama_exe()
+            if not exe or not (ollama_up() or start_ollama(exe)):
+                raise RuntimeError("Le moteur d'IA n'a pas pu démarrer. Redémarrez l'ordinateur puis relancez SchoolBot Mail.")
+        if not ollama_models():
+            m = model_for_pc()
+            SETUP.update(stage="model", pct=30, msg=f"Téléchargement de l'assistant ({m})…")
+            req = urllib.request.Request("http://127.0.0.1:11434/api/pull", data=json.dumps({"name": m}).encode())
+            with urllib.request.urlopen(req, timeout=600) as r:
+                for line in r:
+                    d = json.loads(line or "{}")
+                    if d.get("error"): raise RuntimeError(d["error"])
+                    if d.get("total"):
+                        SETUP.update(pct=30 + 69 * d.get("completed", 0) / d["total"],
+                                     msg=f"Téléchargement de l'assistant : {d.get('completed',0) >> 20} / {d['total'] >> 20} Mo")
+            _MODEL.clear()
+        SETUP.update(stage="ready", pct=100, msg="Prêt !")
+    except Exception as e:
+        SETUP.update(stage="error", msg=str(e))
+
+
+def setup_status():
+    if SETUP["stage"] == "idle" and (CFG.get("ai") or "ollama") == "ollama" and ollama_up() and ollama_models():
+        SETUP.update(stage="ready", pct=100)
+    if (CFG.get("ai") or "ollama") != "ollama":
+        SETUP.update(stage="ready", pct=100)
+    return SETUP
+
+
+def desktop_shortcut():
+    """Crée l'icône sur le bureau au premier lancement de l'application (.exe / .app)."""
+    if not getattr(sys, "frozen", False): return
+    try:
+        home = os.path.expanduser("~")
+        if IS_WIN:
+            desk = subprocess.check_output(["powershell", "-NoProfile", "-Command", "[Environment]::GetFolderPath('Desktop')"],
+                                           creationflags=0x08000000, text=True).strip() or os.path.join(home, "Desktop")
+            lnk = os.path.join(desk, "SchoolBot Mail.lnk")
+            if os.path.exists(lnk): return
+            exe = sys.executable
+            ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}');$s.TargetPath='{exe}';"
+                  f"$s.WorkingDirectory='{os.path.dirname(exe)}';$s.IconLocation='{exe},0';$s.Save()")
+            subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=0x08000000)
+        elif IS_MAC:
+            app = os.path.abspath(os.path.join(sys.executable, "..", "..", ".."))
+            link = os.path.join(home, "Desktop", "SchoolBot Mail")
+            if app.endswith(".app") and not os.path.lexists(link): os.symlink(app, link)
+    except Exception:
+        pass
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -472,6 +609,8 @@ class H(BaseHTTPRequestHandler):
             safe = {k: v for k, v in CFG.items() if k not in ("pass", "api_key")}
             return self.reply({"configured": bool(CFG.get("imap_host") and CFG.get("pass")), "cfg": safe,
                                "has_key": (CFG.get("ai") or "ollama") == "ollama" or bool(CFG.get("api_key") or E("ANTHROPIC_API_KEY"))})
+        if self.path == "/api/setup":
+            return self.reply(setup_status())
         if self.path == "/api/models":
             return self.reply({"models": ollama_models(), "recommended": pick_model()})
         if self.path == "/api/mails":
@@ -488,6 +627,11 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         p = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
         try:
+            if self.path == "/api/setup":
+                if SETUP["stage"] in ("idle", "error"):
+                    SETUP.update(stage="engine", pct=1, msg="Démarrage…")
+                    threading.Thread(target=run_setup, daemon=True).start()
+                return self.reply(SETUP)
             if self.path == "/api/detect":
                 return self.reply(autodetect(p.get("email", "")))
             if self.path == "/api/test":
@@ -516,9 +660,21 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("SchoolBot Mail → http://127.0.0.1:8765")
+    URL = "http://127.0.0.1:8765"
     try:
-        import webbrowser; webbrowser.open("http://127.0.0.1:8765")
+        srv = ThreadingHTTPServer(("127.0.0.1", 8765), H)
+    except OSError:  # déjà lancé : on rouvre simplement la fenêtre
+        import webbrowser; webbrowser.open(URL); sys.exit(0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    desktop_shortcut()
+    print("SchoolBot Mail → " + URL)
+    try:
+        import webview  # fenêtre propre à l'application (version .exe / .app)
+        webview.create_window("SchoolBot Mail", URL, width=1280, height=860, min_size=(900, 600))
+        webview.start()
     except Exception:
-        pass
-    ThreadingHTTPServer(("127.0.0.1", 8765), H).serve_forever()
+        import webbrowser; webbrowser.open(URL)
+        try:
+            while True: time.sleep(3600)
+        except KeyboardInterrupt:
+            pass
