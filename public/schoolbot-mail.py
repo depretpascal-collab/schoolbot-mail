@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """SchoolBot Mail (MailPilot) - tri d'emails par IA, en local. Développé par Educlan Asbl. Aucune dépendance (Python 3.8+).
 
-Au premier lancement, un assistant demande les paramètres IMAP/SMTP et la clé API
-(stockés localement dans ~/.mailpilot/config.json). Détection automatique des serveurs à partir de l'adresse.
+Au premier lancement, un assistant connecte la boîte mail :
+- compte Microsoft 365 (écoles) : on se connecte avec son compte, SchoolBot Mail ne voit jamais le mot de passe ;
+- ou serveurs IMAP/SMTP saisis à la main (repli), détectés automatiquement à partir de l'adresse.
 IA : locale via Ollama (recommandé, les mails ne quittent pas le PC) ou Claude (clé API, ANTHROPIC_API_KEY).
 Lancer : double-clic sur SchoolBot Mail (ou python schoolbot-mail.py)
 """
-import os, re, json, imaplib, smtplib, ssl, urllib.request, urllib.error, datetime, html
+import os, re, json, base64, imaplib, smtplib, ssl, urllib.request, urllib.error, urllib.parse, datetime, html
 from email import message_from_bytes
 from email.header import decode_header, make_header
 from email.message import EmailMessage
@@ -18,9 +19,18 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.3"
+VERSION = "1.4"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
+
+# ---------- Microsoft 365 : on se connecte avec son compte, l'app ne voit jamais le mot de passe ----------
+# Identifiant de l'application à créer une seule fois dans Microsoft Entra (gratuit).
+# Une fois renseigné ici, tous les utilisateurs en bénéficient sans rien configurer.
+MS_CLIENT_ID = ""
+MS_SCOPE = "https://graph.microsoft.com/.default offline_access"
+MS_AUTH = "https://login.microsoftonline.com/common/oauth2/v2.0"
+MS_API = "https://graph.microsoft.com/v1.0"
+MS = {"state": "idle", "user_code": "", "url": "", "msg": ""}
 
 
 def _vtuple(v):
@@ -115,12 +125,19 @@ def body_of(msg):
             htm += txt
     if plain.strip():
         return plain.strip()
-    t = re.sub(r"(?is)<(script|style).*?</\1>", "", htm)
-    t = re.sub(r"(?i)<br\s*/?>|</p>", "\n", t)
+    return strip_html(htm)
+
+
+def strip_html(t):
+    """HTML -> texte lisible (les mails d'école arrivent souvent en HTML)."""
+    t = re.sub(r"(?is)<(script|style).*?</\1>", "", t or "")
+    t = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", t)
     return html.unescape(re.sub(r"<[^>]+>", "", t)).strip()
 
 
 def fetch_today(limit=60):
+    if is_ms():
+        return graph_messages(limit)
     d = datetime.date.today() - datetime.timedelta(days=7)  # les 7 derniers jours
     since = f"{d.day:02d}-{MONTHS[d.month - 1]}-{d.year}"
     M = imap_connect()
@@ -197,6 +214,221 @@ def autodetect(email):
         pass
     return {"imap_host": "imap." + dom, "imap_port": "993", "imap_sec": "ssl", "smtp_host": "smtp." + dom,
             "smtp_port": "587", "smtp_sec": "starttls", "user": email, "source": "supposition"}
+
+
+# ---------- Microsoft 365 : connexion au compte de l'école ----------
+def ms_client_id():
+    return (CFG.get("ms_client_id") or MS_CLIENT_ID).strip()
+
+
+def is_ms():
+    return bool(CFG.get("ms_refresh") or CFG.get("ms_access"))
+
+
+def _post(url, data=None, ctype="application/x-www-form-urlencoded", tok=None):
+    body = None
+    h = {"User-Agent": "SchoolBotMail"}
+    if data is not None:
+        body = (urllib.parse.urlencode(data).encode() if ctype == "application/x-www-form-urlencoded"
+                else json.dumps(data).encode())
+        h["Content-Type"] = ctype
+    if tok:
+        h["Authorization"] = "Bearer " + tok
+    req = urllib.request.Request(url, data=body, headers=h)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        raw = r.read().decode("utf-8")
+    return json.loads(raw) if raw else {}
+
+
+def ms_account(tok):
+    """Lit l'adresse du compte dans le jeton Microsoft (aucune donnée n'est envoyée nulle part)."""
+    try:
+        p = tok.split(".")[1]
+        p += "=" * (-len(p) % 4)
+        c = json.loads(base64.urlsafe_b64decode(p))
+        return c.get("mail") or c.get("email") or c.get("preferred_username") or ""
+    except Exception:
+        return ""
+
+
+def ms_start():
+    """Demande à Microsoft un code temporaire : l'utilisateur le tape, SchoolBot Mail ne voit pas le mot de passe."""
+    if MS.get("state") == "ok":
+        return ms_public()
+    cid = ms_client_id()
+    if not cid:
+        raise RuntimeError("La connexion Microsoft n'est pas encore activée dans cette version de SchoolBot Mail. "
+                           "Écrivez à contact@educlan.org : c'est une seule ligne à ajouter par Educlan.")
+    d = _post(MS_AUTH + "/devicecode", {"client_id": cid, "scope": MS_SCOPE})
+    MS.update(state="waiting", user_code=d["user_code"],
+              url=d.get("verification_uri") or "https://microsoft.com/devicelogin",
+              device_code=d["device_code"], interval=int(d.get("interval") or 5),
+              expires=time.time() + int(d.get("expires_in") or 600),
+              msg="Tapez ce code sur la page de Microsoft.")
+    threading.Thread(target=ms_poll, daemon=True).start()
+    return ms_public()
+
+
+def ms_public():
+    return {k: MS.get(k, "") for k in ("state", "user_code", "url", "msg")}
+
+
+def ms_explain(code, desc):
+    if code in ("access_denied", "interaction_required", "consent_required"):
+        return ("Microsoft a refusé : « " + (desc or "")[:160] + " ». Si l'école interdit d'autoriser elle-même "
+                "des applications, le service informatique de l'école devra donner l'accès.")
+    if code == "expired_token":
+        return "Le code a expiré : relancez « Se connecter avec Microsoft »."
+    return "Microsoft a refusé la connexion : " + (desc or code or "erreur inconnue")[:200]
+
+
+def ms_poll():
+    cid = ms_client_id()
+    time.sleep(MS.get("interval", 5))
+    while MS.get("state") == "waiting":
+        if time.time() > MS.get("expires", 0):
+            MS.update(state="error", msg="Le code a expiré. Relancez la connexion Microsoft.")
+            return
+        try:
+            r = _post(MS_AUTH + "/token", {"client_id": cid,
+                                           "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                                           "device_code": MS["device_code"]})
+        except urllib.error.HTTPError as e:
+            try:
+                err = json.loads(e.read().decode("utf-8", "replace"))
+            except Exception:
+                err = {}
+            c = err.get("error", "")
+            if c == "authorization_pending":
+                time.sleep(MS.get("interval", 5)); continue
+            if c == "slow_down":
+                MS["interval"] = int(MS.get("interval", 5)) + 5; time.sleep(MS["interval"]); continue
+            MS.update(state="error", msg=ms_explain(c, err.get("error_description", "")))
+            return
+        except Exception:
+            time.sleep(MS.get("interval", 5)); continue
+        acct = ms_account(r.get("id_token") or "")
+        save_cfg({"ms_access": r["access_token"], "ms_refresh": r.get("refresh_token", ""),
+                  "ms_expiry": time.time() + int(r.get("expires_in", 3600)),
+                  "ms_email": acct or CFG.get("email", ""),
+                  "email": acct or CFG.get("email", ""), "provider": "microsoft"})
+        MS.update(state="ok", msg="Connecté !")
+        _MODEL.clear()
+        return
+
+
+def ms_token():
+    """Jeton d'accès en cours de validité, renouvelé en silence si nécessaire."""
+    if CFG.get("ms_access") and time.time() < float(CFG.get("ms_expiry", 0) or 0) - 60:
+        return CFG["ms_access"]
+    rt = CFG.get("ms_refresh")
+    if not rt:
+        raise RuntimeError("La connexion Microsoft est périmée : reconnectez-vous avec votre compte.")
+    try:
+        r = _post(MS_AUTH + "/token", {"client_id": ms_client_id(), "grant_type": "refresh_token",
+                                       "refresh_token": rt, "scope": MS_SCOPE})
+    except urllib.error.HTTPError:
+        save_cfg({"ms_access": "", "ms_refresh": "", "ms_expiry": 0})
+        raise RuntimeError("Microsoft ne reconnaît plus cette session : reconnectez-vous avec votre compte.")
+    save_cfg({"ms_access": r["access_token"], "ms_refresh": r.get("refresh_token", rt),
+              "ms_expiry": time.time() + int(r.get("expires_in", 3600))})
+    return r["access_token"]
+
+
+def graph(path, method="GET", body=None):
+    req = urllib.request.Request(MS_API + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": "Bearer " + ms_token(),
+                                          "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            raw = r.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        det = e.read().decode("utf-8", "replace")[:250]
+        if e.code in (401, 403):
+            raise RuntimeError("Microsoft a refusé l'accès à la boîte (" + str(e.code) + "). "
+                               "Reconnectez-vous avec votre compte (bouton ⚙). Détail : " + det)
+        raise RuntimeError("Erreur Microsoft 365 (" + str(e.code) + ") : " + det)
+    return json.loads(raw) if raw else {}
+
+
+def ms_date(iso):
+    try:
+        dt = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
+    except Exception:
+        return iso or ""
+    j = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."][dt.weekday()]
+    m = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."][dt.month - 1]
+    return "%s %d %s %02d:%02d" % (j, dt.day, m, dt.hour, dt.minute)
+
+
+def graph_messages(limit=60):
+    """Lit les 7 derniers jours de la boîte via Microsoft (sans jamais demander de mot de passe)."""
+    since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    q = urllib.parse.urlencode({"$top": limit, "$orderby": "receivedDateTime desc",
+                                "$select": "id,from,receivedDateTime,subject,bodyPreview,conversationId,internetMessageId",
+                                "$filter": "receivedDateTime ge " + since})
+    out = []
+    for i, m in enumerate(graph("/me/mailFolders/inbox/messages?" + q).get("value", [])):
+        f = m.get("from", {}).get("emailAddress", {})
+        out.append({"id": str(i + 1), "gid": m.get("id", ""), "conv": m.get("conversationId", ""),
+                    "from": "%s <%s>" % (f.get("name") or f.get("address") or "", f.get("address") or ""),
+                    "subject": m.get("subject") or "(sans objet)",
+                    "date": ms_date(m.get("receivedDateTime", "")),
+                    "body": (m.get("bodyPreview") or "").strip(),
+                    "reply_to": f.get("address") or "", "message_id": m.get("internetMessageId") or "",
+                    "category": "info", "summary": "", "full": False})
+    return out
+
+
+def graph_open(m):
+    """Récupère le texte complet du mail et l'historique de la conversation (auteurs et dates séparés)."""
+    if m.get("full"):
+        return
+    try:
+        full = graph("/me/messages/" + m["gid"] + "?$select=body,from,receivedDateTime")
+    except RuntimeError:
+        m["full"] = True
+        return
+    m["body"] = strip_html(full.get("body", {}).get("content") or m.get("body", ""))[:6000]
+    m["full"] = True
+    conv = m.get("conv")
+    if not conv:
+        return
+    q = urllib.parse.urlencode({"$top": 8, "$orderby": "receivedDateTime desc",
+                                "$select": "id,body,from,receivedDateTime",
+                                "$filter": "conversationId eq '" + conv.replace("'", "") + "'"})
+    try:
+        th = graph("/me/messages?" + q).get("value", [])
+    except RuntimeError:
+        return
+    hist = []
+    for p in th:
+        if p.get("id") == m["gid"]:
+            continue
+        f = p.get("from", {}).get("emailAddress", {})
+        who = f.get("name") or f.get("address") or "?"
+        txt = strip_html(p.get("body", {}).get("content") or "")[:1200]
+        hist.append("De : %s, le %s\n%s" % (who, ms_date(p.get("receivedDateTime", "")), txt))
+    if hist:
+        m["history"] = "\n\n".join(hist)
+
+
+def graph_reply(m, text):
+    """Prépare la réponse dans Microsoft (destinataire et objet déjà bons), puis l'envoie telle que modifiée."""
+    d = graph("/me/messages/" + m["gid"] + "/createReply", "POST", {})
+    did = d.get("id")
+    if not did:
+        raise RuntimeError("Microsoft n'a pas préparé la réponse.")
+    graph("/me/messages/" + did, "PATCH", {"body": {"contentType": "Text", "content": text}})
+    graph("/me/messages/" + did + "/send", "POST", {})
+
+
+def graph_mail(p, subj):
+    graph("/me/sendMail", "POST", {"message": {"subject": subj,
+                                              "body": {"contentType": "Text", "content": p["body"]},
+                                              "toRecipients": [{"emailAddress": {"address": p["to"]}}]},
+                                   "saveToSentItems": True})
 
 
 PREF = ["mistral-small", "mistral-nemo", "gemma2:9b", "gemma2", "llama3.2", "mistral"]
@@ -312,10 +544,18 @@ def split_thread(body):
 
 
 def draft(m):
-    me = CFG.get("email", "")
+    if is_ms():
+        try:
+            graph_open(m)
+        except RuntimeError:
+            pass
+    me = CFG.get("ms_email") or CFG.get("email", "")
     sig = CFG.get("signature", "").strip()
     sender_name, sender_addr = parseaddr(m["from"])
-    new, history = split_thread(m["body"])
+    if m.get("history"):
+        new, history = m["body"], m["history"]  # historique propre fourni par Microsoft (messages séparés)
+    else:
+        new, history = split_thread(m["body"])
     today = datetime.date.today().strftime("%A %d/%m/%Y")
     sys_ = (
         "Tu es l'assistant de l'UTILISATEUR et tu rédiges SA réponse à un email. "
@@ -343,10 +583,18 @@ def draft(m):
 
 
 def send(p):
+    subj = p["subject"]
+    subj = subj if subj.lower().startswith("re:") else "Re: " + subj
+    if is_ms():
+        m = MAILS.get(str(p.get("id")))
+        if m and m.get("gid"):
+            graph_reply(m, p["body"])
+            return
+        graph_mail(p, subj)
+        return
     msg = EmailMessage()
     msg["From"], msg["To"] = CFG.get("email") or CFG["user"], p["to"]
-    subj = p["subject"]
-    msg["Subject"] = subj if subj.lower().startswith("re:") else "Re: " + subj
+    msg["Subject"] = subj
     if p.get("message_id"):
         msg["In-Reply-To"] = msg["References"] = p["message_id"]
     msg["Message-ID"] = make_msgid()
@@ -411,6 +659,8 @@ input,select{width:100%;padding:10px 12px;font:inherit;color:var(--fg);backgroun
 input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);border-color:var(--ac)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 #st,#wst{color:var(--mut);font-size:13px}
+.msbox{margin:18px 0;padding:18px;border-radius:16px;background:linear-gradient(160deg,#eef4ff,#fdf6e7);border:1px solid #c7d8f8}
+.code{font-size:26px;font-weight:800;letter-spacing:.16em;color:var(--ac2)}
 @media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
@@ -418,7 +668,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
 <script>
-const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={};
+const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={},msFound=0;
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
  b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.remove();return false">Plus tard</a>'}).catch(()=>{});
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
@@ -434,19 +684,37 @@ async function fillModels(sel,cur){sel.add(new Option('Automatique — le meille
   if(g.children.length)sel.add(g)}
  catch(e){for(const m of['mistral-small','mistral-nemo','mistral','llama3.2'])sel.add(new Option(m,m))}
  sel.value=(cur&&[...sel.options].some(o=>o.value===cur))?cur:'auto'}
-function wizard(c){c=c||{};app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
+function wizard(c){c=c||{};msFound=0;app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div id="mszone" style="display:none"></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
  const f=$('#fields');
  for(const[k,t,ty]of F){const w=document.createElement('div');const l=document.createElement('label');l.textContent=t;let i;
-  if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
+   if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
   else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
   else if(ty==='model'){i=document.createElement('select');fillModels(i,c[k])}
   else{i=document.createElement('input');i.type=ty||'text'}
   i.id='f_'+k;if(ty!=='model'&&c[k])i.value=c[k];w.append(l,i);f.append(w)}
- if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess}
+ if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess;
+ if(c.ms)msLogged(c)}
+function msLogged(c){msFound=1;const z=$('#mszone');z.style.display='block';
+ z.innerHTML='<div class="msbox">Compte Microsoft connecté : <b>'+esc(c.ms_email||c.email||'')+'</b>'+
+ '<div class="row" style="margin-top:12px"><button class="g" onclick="msOut()">Se déconnecter</button></div></div>'}
 async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$('#wst').textContent='Recherche des paramètres…';
  const r=await(await fetch('/api/detect',{method:'POST',body:JSON.stringify({email:e})})).json();if(r.error){$('#wst').textContent=r.error;return}
  for(const k of['user','imap_host','imap_port','imap_sec','smtp_host','smtp_port','smtp_sec'])if(r[k])$('#f_'+k).value=r[k];
+ if((r.source||'').indexOf('Microsoft')>=0){msAsk();return}
  $('#wst').textContent=r.source==='supposition'?'Paramètres supposés : vérifiez-les avec « Tester la connexion ».':'Paramètres trouvés ('+r.source+'). Entrez le mot de passe puis testez.'}
+function msAsk(){msFound=1;const z=$('#mszone');z.style.display='block';
+ z.innerHTML='<div class="msbox"><b>Votre boîte est chez Microsoft 365.</b><p style="margin:6px 0 14px;color:var(--mut)">Le plus simple : connectez-vous avec votre compte habituel. SchoolBot Mail ne verra jamais votre mot de passe.</p>'+
+ '<div class="row"><button onclick="msGo()">Se connecter avec Microsoft</button><button class="g" onclick="msHide()">Ou saisir un mot de passe</button></div><p id="msmsg"></p></div>'}
+function msHide(){const z=$('#mszone');z.style.display='none';msFound=0;$('#wst').textContent='Entrez le mot de passe puis testez la connexion.'}
+async function msGo(){const m=$('#msmsg');m.textContent='Préparation de la connexion…';
+ const r=await(await fetch('/api/ms/start',{method:'POST',body:'{}'})).json();
+ if(r.error){m.textContent=r.error;return}msPoll()}
+async function msPoll(){const r=await(await fetch('/api/ms/status')).json();const m=$('#msmsg');if(!m)return;
+ if(r.state==='waiting'){m.innerHTML='Ouvrez <a href="'+r.url+'" target="_blank">la page de Microsoft</a> et tapez ce code :<div class="code">'+esc(r.user_code)+'</div>';
+  setTimeout(msPoll,1500)}
+ else if(r.state==='ok'){m.innerHTML='✅ Connecté. Appuyez sur « Enregistrer et commencer ».'}
+ else if(r.state==='error'){m.textContent=r.msg}}
+async function msOut(){await fetch('/api/ms/out',{method:'POST',body:'{}'});msFound=0;$('#mszone').style.display='none';$('#wst').textContent='Connexion Microsoft coupée.'}
 const vals=()=>Object.fromEntries(F.map(([k])=>[k,$('#f_'+k).value]));
 async function testIt(){$('#wst').textContent='Test en cours…';const r=await(await fetch('/api/test',{method:'POST',body:JSON.stringify(vals())})).json();$('#wst').textContent='Réception : '+r.imap+' · Envoi : '+r.smtp}
 async function saveIt(){const v=vals();let dl=null;if((v.ollama_model||'').startsWith('dl:')){dl=v.ollama_model.slice(3);v.ollama_model=dl}
@@ -484,14 +752,16 @@ function list(f){filter=f;const c=counts();
 function getDraft(m){if(!m.p)m.p=fetch('/api/draft',{method:'POST',body:JSON.stringify({id:m.id})}).then(r=>r.json()).then(j=>{if(j.draft)m.draft=j.draft;else m.p=null;return j});return m.p}
 async function prefetch(){for(const m of mails.filter(m=>m.category==='urgent'||m.category==='repondre')){try{await getDraft(m)}catch(e){}}}
 async function openMail(id){cur=mails.find(m=>m.id===id);
- app.innerHTML='<div class="row" style="margin-bottom:14px"><button class="g" onclick="list(filter)">← Retour</button></div><div class="split"><div class="panel"><div class="label">MAIL REÇU</div><h2 style="margin:8px 0 2px;font-size:20px">'+esc(cur.subject)+'</h2><small style="color:var(--mut)">'+esc(cur.from)+' · '+esc(cur.date)+'</small><pre>'+esc(cur.body)+'</pre></div>'+
+ app.innerHTML='<div class="row" style="margin-bottom:14px"><button class="g" onclick="list(filter)">← Retour</button></div><div class="split"><div class="panel"><div class="label">MAIL REÇU</div><h2 style="margin:8px 0 2px;font-size:20px">'+esc(cur.subject)+'</h2><small style="color:var(--mut)">'+esc(cur.from)+' · '+esc(cur.date)+'</small><pre id="mb">'+esc(cur.body)+'</pre></div>'+
  '<div class="panel reply"><div class="label"><span class="dot" style="color:var(--yel);background:var(--yel)"></span>RÉPONSE PRÉPARÉE PAR L’IA</div><h2 style="margin:8px 0 2px;font-size:18px">Re: '+esc(cur.subject.replace(/^re: */i,''))+'</h2><small style="color:var(--mut)">À : '+esc(cur.from)+'</small>'+
  '<textarea id="reply" readonly>Rédaction en cours…</textarea><div class="note">✦ Rédigée à partir de l’historique — vous validez, il envoie.</div><div class="row"><button class="g" onclick="edit()">✎ Modifier</button><button class="g" onclick="redo()">↻ Regénérer</button><button class="grow" onclick="sendIt()">✉ Envoyer</button></div><p id="st"></p></div></div>';
+ try{const j=await(await fetch('/api/open',{method:'POST',body:JSON.stringify({id})})).json();
+  if(j.body&&$('#mb'))$('#mb').textContent=j.body}catch(e){}
  const j=await getDraft(cur);$('#reply').value=cur.draft||('Erreur : '+j.error)}
 function edit(){const t=$('#reply');t.readOnly=false;t.focus()}
 async function redo(){cur.p=null;cur.draft=null;$('#reply').value='Rédaction en cours…';const j=await getDraft(cur);$('#reply').value=cur.draft||('Erreur : '+j.error)}
 async function sendIt(){if(!confirm('Envoyer cette réponse à '+cur.reply_to+' ?'))return;$('#st').textContent='Envoi…';
- const r=await fetch('/api/send',{method:'POST',body:JSON.stringify({to:cur.reply_to,subject:cur.subject,body:$('#reply').value,message_id:cur.message_id})});
+ const r=await fetch('/api/send',{method:'POST',body:JSON.stringify({id:cur.id,to:cur.reply_to,subject:cur.subject,body:$('#reply').value,message_id:cur.message_id})});
  const j=await r.json();$('#st').textContent=j.ok?'✅ Envoyé':'Erreur : '+j.error}
 load();
 </script></html>"""
@@ -652,8 +922,10 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/":
             return self.reply(PAGE, ctype="text/html")
         if self.path == "/api/config":
-            safe = {k: v for k, v in CFG.items() if k not in ("pass", "api_key")}
-            return self.reply({"configured": bool(CFG.get("imap_host") and CFG.get("pass")), "cfg": safe,
+            safe = {k: v for k, v in CFG.items()
+                    if k not in ("pass", "api_key") and not k.startswith("ms_access") and not k.startswith("ms_refresh")}
+            safe["ms"] = is_ms()
+            return self.reply({"configured": is_ms() or bool(CFG.get("imap_host") and CFG.get("pass")), "cfg": safe,
                                "has_key": (CFG.get("ai") or "ollama") == "ollama" or bool(CFG.get("api_key") or E("ANTHROPIC_API_KEY"))})
         if self.path == "/api/setup":
             return self.reply(setup_status())
@@ -661,6 +933,8 @@ class H(BaseHTTPRequestHandler):
             return self.reply({"models": ollama_models(), "recommended": pick_model()})
         if self.path == "/api/update":
             return self.reply(check_update())
+        if self.path == "/api/ms/status":
+            return self.reply(ms_public())
         if self.path == "/api/mails":
             try:
                 ms = fetch_today()
@@ -683,6 +957,12 @@ class H(BaseHTTPRequestHandler):
                 return self.reply(SETUP)
             if self.path == "/api/detect":
                 return self.reply(autodetect(p.get("email", "")))
+            if self.path == "/api/ms/start":
+                return self.reply(ms_start())
+            if self.path == "/api/ms/out":
+                save_cfg({"ms_access": "", "ms_refresh": "", "ms_expiry": 0, "provider": ""})
+                MS.update(state="idle", user_code="", msg="")
+                return self.reply({"ok": True})
             if self.path == "/api/test":
                 c = dict(CFG)
                 c.update({k: v for k, v in p.items() if v != ""})
@@ -698,6 +978,13 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/config":
                 save_cfg({k: v for k, v in p.items() if v != ""})
                 return self.reply({"ok": True})
+            if self.path == "/api/open":
+                m = MAILS.get(str(p.get("id")))
+                if not m:
+                    return self.reply({"error": "mail introuvable"}, 404)
+                if is_ms():
+                    graph_open(m)
+                return self.reply({"body": m.get("body", "")})
             if self.path == "/api/draft":
                 return self.reply({"draft": draft(MAILS[p["id"]])})
             if self.path == "/api/send":
