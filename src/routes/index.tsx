@@ -1,24 +1,57 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "SchoolBot Mail — votre boîte mail triée par IA, sur votre PC" },
+      { name: "description", content: "Logiciel gratuit pour directions et secrétariats d'écoles : tri des mails et réponses proposées par IA, sans que vos mails quittent l'ordinateur." },
+      { property: "og:title", content: "SchoolBot Mail — tri des mails par IA, en local" },
+      { property: "og:description", content: "Gratuit, installé sur votre PC, vos mails ne le quittent jamais. Offert par SchoolBot.be." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
+const steps = [
+  ["Installez Python", "Gratuit, depuis python.org (cochez « Add to PATH »)."],
+  ["Installez l'IA locale", "Ollama (ollama.com), puis la commande : ollama pull mistral"],
+  ["Lancez SchoolBot Mail", "Double-cliquez sur le fichier : le navigateur s'ouvre tout seul."],
+  ["Tapez votre adresse", "Les serveurs sont trouvés automatiquement. Ajoutez le mot de passe, testez, c'est parti."],
+];
+
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="min-h-screen bg-background text-foreground">
+      <section className="mx-auto max-w-3xl px-6 py-20">
+        <p className="text-sm text-muted-foreground">Offert par SchoolBot.be</p>
+        <h1 className="mt-2 text-4xl font-bold tracking-tight">SchoolBot Mail</h1>
+        <p className="mt-4 text-lg text-muted-foreground">
+          Chaque matin, vos mails du jour triés en Urgent, À traiter, À lire, Postposable — avec une réponse
+          déjà rédigée. Tout se passe sur votre ordinateur : aucun mail n'en sort.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Button asChild size="lg">
+            <a href="/schoolbot-mail.py" download>Télécharger (gratuit)</a>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <a href="https://schoolbot.be" target="_blank" rel="noreferrer">Découvrir SchoolBot</a>
+          </Button>
+        </div>
+        <ol className="mt-14 space-y-4">
+          {steps.map(([t, d], i) => (
+            <li key={t} className="flex gap-4 rounded-lg border bg-card p-4">
+              <span className="font-bold text-primary">{i + 1}</span>
+              <div>
+                <p className="font-semibold">{t}</p>
+                <p className="text-sm text-muted-foreground">{d}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+    </main>
   );
 }
