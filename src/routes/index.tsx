@@ -17,7 +17,7 @@ export const Route = createFileRoute("/")({
 
 const steps = [
   ["Téléchargez et décompressez", "Récupérez le fichier zip, puis décompressez-le (clic droit → « Extraire tout »)."],
-  ["Double-cliquez sur SchoolBot Mail", "Windows peut afficher un écran bleu de sécurité : cliquez sur « Informations complémentaires », puis « Exécuter quand même »."],
+  ["Double-cliquez sur SchoolBot Mail", "Ouvrez le dossier « SchoolBot Mail » et double-cliquez sur SchoolBot Mail.exe. Si Windows affiche un écran bleu : « Informations complémentaires », puis « Exécuter quand même »."],
   ["Laissez l'assistant travailler", "L'IA s'installe et se prépare toute seule, sans aucune commande à taper."],
   ["Tapez votre adresse", "Les serveurs sont trouvés automatiquement. Ajoutez le mot de passe, testez, c'est parti."],
 ];

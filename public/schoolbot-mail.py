@@ -18,7 +18,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.2"
+VERSION = "1.3"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -551,8 +551,12 @@ def download(url, dest, lo, hi, msg):
 
 
 def start_ollama(exe):
-    flags = 0x08000000 if IS_WIN else 0  # pas de fenêtre noire
-    subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags)
+    # Lancé détaché : pas de fenêtre noire, et Ollama ne garde aucun fichier du programme ouvert.
+    flags = (0x08000000 | 0x00000008 | 0x00000200) if IS_WIN else 0
+    env = {k: v for k, v in os.environ.items() if not k.startswith("_MEI") and k not in ("_PYI_APPLICATION_HOME_DIR", "_PYI_ARCHIVE_FILE", "_PYI_PARENT_PROCESS_LEVEL")}
+    subprocess.Popen([exe, "serve"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     creationflags=flags, cwd=os.path.expanduser("~"), env=env, close_fds=True,
+                     start_new_session=not IS_WIN)
     for _ in range(40):
         if ollama_up(): return True
         time.sleep(1)
