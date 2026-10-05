@@ -201,21 +201,33 @@ def claude(system, user, max_tokens=2000):
         return "".join(b.get("text", "") for b in json.load(r)["content"])
 
 
+CATS = ("urgent", "repondre", "transmettre", "administratif", "info", "pub")
+
+
 def classify(mails):
     if not mails:
         return
-    items = [{"id": m["id"], "from": m["from"], "subject": m["subject"], "extrait": m["body"][:500]} for m in mails]
-    sys_ = ("Tu tries une boîte mail. Pour chaque mail, choisis une catégorie parmi : urgent, a_traiter, "
-            "a_lire, postposable. Ajoute un résumé d'une phrase en français. Réponds UNIQUEMENT par un "
+    sys_ = ("Tu tries la boîte mail d'une école (direction / secrétariat). Pour chaque mail, choisis UNE catégorie : "
+            "urgent (ne peut pas attendre : absence imprévue, sécurité, délai aujourd'hui), "
+            "repondre (une personne attend une réponse : parent, enseignant, partenaire), "
+            "transmettre (concerne surtout un collègue ou un autre service), "
+            "administratif (factures, circulaires, documents officiels à ranger), "
+            "info (à lire, aucune action), pub (publicités, newsletters, notifications automatiques). "
+            "Ajoute un résumé d'une phrase en français : qui écrit, pourquoi, ce que ça demande. Réponds UNIQUEMENT par un "
             'tableau JSON : [{"id":"..","category":"..","summary":".."}]')
-    txt = ai(sys_, json.dumps(items, ensure_ascii=False), 4000)
-    try:
-        res = json.loads(re.search(r"\[.*\]", txt, re.S).group(0))
-        for r in res:
-            if r["id"] in MAILS and r.get("category") in ("urgent", "a_traiter", "a_lire", "postposable"):
-                MAILS[r["id"]]["category"], MAILS[r["id"]]["summary"] = r["category"], r.get("summary", "")
-    except Exception:
-        pass
+    for i in range(0, len(mails), 15):  # par lots : plus fiable avec un modèle local
+        items = [{"id": m["id"], "from": m["from"], "subject": m["subject"], "extrait": m["body"][:400]}
+                 for m in mails[i:i + 15]]
+        try:
+            txt = ai(sys_, json.dumps(items, ensure_ascii=False), 3000)
+            for r in json.loads(re.search(r"\[.*\]", txt, re.S).group(0)):
+                rid = str(r.get("id"))
+                if rid in MAILS and r.get("category") in CATS:
+                    MAILS[rid]["category"], MAILS[rid]["summary"] = r["category"], r.get("summary", "")
+        except RuntimeError:
+            raise
+        except Exception:
+            pass
 
 
 def split_thread(body):
