@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SchoolBot Mail (MailPilot) - tri d'emails par IA, en local. Offert par SchoolBot.be. Aucune dépendance (Python 3.8+).
+"""SchoolBot Mail (MailPilot) - tri d'emails par IA, en local. Développé par Educlan Asbl. Aucune dépendance (Python 3.8+).
 
 Au premier lancement, un assistant demande les paramètres IMAP/SMTP et la clé API
 (stockés localement dans ~/.mailpilot/config.json). Détection automatique des serveurs à partir de l'adresse.
@@ -413,7 +413,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 #st,#wst{color:var(--mut);font-size:13px}
 @media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
 </style>
-<header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>offert par <a href="https://schoolbot.be" target="_blank">SchoolBot.be</a></small></div>
+<header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
 <span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button onclick="load()">Traiter mes mails</button></header>
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
