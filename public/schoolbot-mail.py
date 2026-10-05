@@ -20,7 +20,7 @@ CFG = {}
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
 VERSION = "1.1"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
-GITHUB_REPO = "depretpascal-collab/clever-mailbox-helper"
+GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
 
 def _vtuple(v):

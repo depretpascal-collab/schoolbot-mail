@@ -34,7 +34,7 @@ function Index() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild size="lg">
-            <a href="https://github.com/depretpascal-collab/clever-mailbox-helper/releases/latest/download/SchoolBot-Mail-Windows.zip">Télécharger pour Windows (gratuit)</a>
+            <a href="https://github.com/depretpascal-collab/schoolbot-mail/releases/latest/download/SchoolBot-Mail-Windows.zip">Télécharger pour Windows (gratuit)</a>
           </Button>
           <Button asChild size="lg" variant="outline">
             <a href="https://github.com/depretpascal-collab/clever-mailbox-helper/releases/latest/download/SchoolBot-Mail-Mac.zip">Pour Mac</a>
