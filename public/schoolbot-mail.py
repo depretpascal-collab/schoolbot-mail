@@ -172,16 +172,47 @@ def autodetect(email):
             "smtp_port": "587", "smtp_sec": "starttls", "user": email, "source": "supposition"}
 
 
+PREF = ["mistral-small", "mistral-nemo", "gemma2:9b", "gemma2", "llama3.2", "mistral"]
+_MODEL = {}
+
+
+def ollama_models():
+    """Modèles installés sur ce PC (aucun mail n'est transmis)."""
+    try:
+        with urllib.request.urlopen((CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/tags", timeout=5) as r:
+            return [m["name"] for m in json.load(r).get("models", [])]
+    except Exception:
+        return []
+
+
+def pick_model():
+    """Le meilleur modèle déjà installé sur ce PC, choisi tout seul."""
+    if _MODEL.get("m"):
+        return _MODEL["m"]
+    got = ollama_models()
+    if not got:
+        return CFG.get("ollama_model") or "mistral"
+    for p in PREF:
+        for g in got:
+            if g == p or g.split(":")[0] == p:
+                _MODEL["m"] = g
+                return g
+    _MODEL["m"] = got[0]
+    return got[0]
+
+
 def ai(system, user, max_tokens=2000):
     if (CFG.get("ai") or "ollama") == "ollama":
+        model = CFG.get("ollama_model") or "auto"
+        if model in ("", "auto"):
+            model = pick_model()
         req = urllib.request.Request(
             (CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/chat",
-            data=json.dumps({"model": CFG.get("ollama_model") or "mistral", "stream": False,
+            data=json.dumps({"model": model, "stream": False,
                              "options": {"num_predict": max_tokens},
                              "messages": [{"role": "system", "content": system},
                                           {"role": "user", "content": user}]}).encode(),
             headers={"content-type": "application/json"})
-        model = CFG.get("ollama_model") or "mistral"
         try:
             with urllib.request.urlopen(req, timeout=300) as r:
                 return json.load(r)["message"]["content"]
