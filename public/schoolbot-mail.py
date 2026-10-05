@@ -18,7 +18,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.1"
+VERSION = "1.2"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -420,7 +420,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 <script>
 const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={};
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
- b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.style.display=\'none\';return false">Plus tard</a>'}).catch(()=>{});
+ b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.remove();return false">Plus tard</a>'}).catch(()=>{});
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
