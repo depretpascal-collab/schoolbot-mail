@@ -31,3 +31,5 @@ jobs:
           tag_name: latest
           name: SchoolBot Mail - dernière version
           files: SchoolBot-Mail-*.zip
+
+# trigger build
