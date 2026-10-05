@@ -22,6 +22,21 @@ const steps = [
   ["Tapez votre adresse", "Les serveurs sont trouvés automatiquement. Ajoutez le mot de passe, testez, c'est parti."],
 ];
 
+async function download() {
+  // Le fichier est récupéré par la page puis enregistré localement : évite le blocage
+  // des téléchargements directs dans l'aperçu protégé.
+  const res = await fetch("/schoolbot-mail.py", { credentials: "include" });
+  const blob = new Blob([await res.text()], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "schoolbot-mail.py";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function Index() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -33,9 +48,7 @@ function Index() {
           déjà rédigée. Tout se passe sur votre ordinateur : aucun mail n'en sort.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild size="lg">
-            <a href="/schoolbot-mail.py" download>Télécharger (gratuit)</a>
-          </Button>
+          <Button size="lg" onClick={download}>Télécharger (gratuit)</Button>
           <Button asChild size="lg" variant="outline">
             <a href="https://schoolbot.be" target="_blank" rel="noreferrer">Découvrir SchoolBot</a>
           </Button>
