@@ -218,11 +218,7 @@ def ai(system, user, max_tokens=2000):
                 return json.load(r)["message"]["content"]
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                try:
-                    with urllib.request.urlopen((CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/tags", timeout=5) as r:
-                        names = ", ".join(m["name"] for m in json.load(r).get("models", [])) or "aucun"
-                except Exception:
-                    names = "?"
+                names = ", ".join(ollama_models()) or "aucun"
                 raise RuntimeError("Le modèle '" + model + "' n'est pas (encore) téléchargé dans Ollama. "
                                    "Modèles disponibles sur ce PC : " + names +
                                    ". Corrigez le nom dans ⚙ « Modèle local », ou attendez la fin du téléchargement.")
