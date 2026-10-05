@@ -466,6 +466,8 @@ class H(BaseHTTPRequestHandler):
             safe = {k: v for k, v in CFG.items() if k not in ("pass", "api_key")}
             return self.reply({"configured": bool(CFG.get("imap_host") and CFG.get("pass")), "cfg": safe,
                                "has_key": (CFG.get("ai") or "ollama") == "ollama" or bool(CFG.get("api_key") or E("ANTHROPIC_API_KEY"))})
+        if self.path == "/api/models":
+            return self.reply({"models": ollama_models(), "recommended": pick_model()})
         if self.path == "/api/mails":
             try:
                 ms = fetch_today()
