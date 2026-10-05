@@ -18,7 +18,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.0"
+VERSION = "1.1"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/clever-mailbox-helper"
 
@@ -425,9 +425,13 @@ const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','v
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
 const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)","model"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+const CATALOG=[['mistral-small','meilleur français, 16 Go de mémoire conseillés (~14 Go)'],['mistral-nemo','bon français, 8-16 Go (~7 Go)'],['gemma2:9b','correct, 8 Go (~5 Go)'],['llama3.2','léger, PC modeste (~2 Go)'],['mistral','très léger, français moyen (~4 Go)']];
 async function fillModels(sel,cur){sel.add(new Option('Automatique — le meilleur modèle installé','auto'));
  try{const r=await(await fetch('/api/models')).json();
-  for(const m of r.models)sel.add(new Option(m+(m===r.recommended?' — conseillé':''),m))}
+  for(const m of r.models)sel.add(new Option(m+(m===r.recommended?' — conseillé':''),m));
+  const g=document.createElement('optgroup');g.label='Télécharger un autre modèle…';
+  for(const[m,d]of CATALOG)if(!r.models.some(x=>x===m||x.startsWith(m+':')))g.append(new Option('⬇ '+m+' — '+d,'dl:'+m));
+  if(g.children.length)sel.add(g)}
  catch(e){for(const m of['mistral-small','mistral-nemo','mistral','llama3.2'])sel.add(new Option(m,m))}
  sel.value=(cur&&[...sel.options].some(o=>o.value===cur))?cur:'auto'}
 function wizard(c){c=c||{};app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
@@ -445,10 +449,12 @@ async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$(
  $('#wst').textContent=r.source==='supposition'?'Paramètres supposés : vérifiez-les avec « Tester la connexion ».':'Paramètres trouvés ('+r.source+'). Entrez le mot de passe puis testez.'}
 const vals=()=>Object.fromEntries(F.map(([k])=>[k,$('#f_'+k).value]));
 async function testIt(){$('#wst').textContent='Test en cours…';const r=await(await fetch('/api/test',{method:'POST',body:JSON.stringify(vals())})).json();$('#wst').textContent='Réception : '+r.imap+' · Envoi : '+r.smtp}
-async function saveIt(){await fetch('/api/config',{method:'POST',body:JSON.stringify(vals())});load()}
+async function saveIt(){const v=vals();let dl=null;if((v.ollama_model||'').startsWith('dl:')){dl=v.ollama_model.slice(3);v.ollama_model=dl}
+ await fetch('/api/config',{method:'POST',body:JSON.stringify(v)});
+ if(dl)await fetch('/api/setup',{method:'POST',body:JSON.stringify({model:dl})});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
 async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.stage==='ready')return true;
- app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2>Préparation de votre assistant</h2><p id="sm">Une seule fois : SchoolBot Mail installe son intelligence artificielle sur cet ordinateur. Vos mails ne le quitteront jamais. Comptez 10 à 20 minutes.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
+ app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2>Préparation de votre assistant</h2><p id="sm">'+(s.want?'SchoolBot Mail télécharge le modèle <b>'+esc(s.want)+'</b>. Vos mails ne quittent pas cet ordinateur. Selon la connexion, comptez quelques minutes.':'Une seule fois : SchoolBot Mail installe son intelligence artificielle sur cet ordinateur. Vos mails ne le quitteront jamais. Comptez 10 à 20 minutes.')+'</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  s=await(await fetch('/api/setup',{method:'POST',body:'{}'})).json();
  while(s.stage!=='ready'){$('#bar').style.width=(s.pct||1)+'%';$('#cnt').textContent=s.msg||'';
   if(s.stage==='error'){$('#cnt').innerHTML=esc(s.msg)+' <button onclick="load()">Réessayer</button>';return false}
@@ -553,7 +559,20 @@ def start_ollama(exe):
     return False
 
 
-def run_setup():
+def pull_model(m):
+    SETUP.update(stage="model", pct=30, msg=f"Téléchargement de l'assistant ({m})…")
+    req = urllib.request.Request("http://127.0.0.1:11434/api/pull", data=json.dumps({"name": m}).encode())
+    with urllib.request.urlopen(req, timeout=600) as r:
+        for line in r:
+            d = json.loads(line or "{}")
+            if d.get("error"): raise RuntimeError(d["error"])
+            if d.get("total"):
+                SETUP.update(pct=30 + 69 * d.get("completed", 0) / d["total"],
+                             msg=f"Téléchargement de {m} : {d.get('completed',0) >> 20} / {d['total'] >> 20} Mo")
+    _MODEL.clear()
+
+
+def run_setup(want=None):
     try:
         SETUP.update(stage="engine", pct=2, msg="Vérification du moteur d'IA…")
         if not ollama_up():
@@ -575,18 +594,10 @@ def run_setup():
                 exe = ollama_exe()
             if not exe or not (ollama_up() or start_ollama(exe)):
                 raise RuntimeError("Le moteur d'IA n'a pas pu démarrer. Redémarrez l'ordinateur puis relancez SchoolBot Mail.")
-        if not ollama_models():
-            m = model_for_pc()
-            SETUP.update(stage="model", pct=30, msg=f"Téléchargement de l'assistant ({m})…")
-            req = urllib.request.Request("http://127.0.0.1:11434/api/pull", data=json.dumps({"name": m}).encode())
-            with urllib.request.urlopen(req, timeout=600) as r:
-                for line in r:
-                    d = json.loads(line or "{}")
-                    if d.get("error"): raise RuntimeError(d["error"])
-                    if d.get("total"):
-                        SETUP.update(pct=30 + 69 * d.get("completed", 0) / d["total"],
-                                     msg=f"Téléchargement de l'assistant : {d.get('completed',0) >> 20} / {d['total'] >> 20} Mo")
-            _MODEL.clear()
+        if want and want not in ollama_models():
+            pull_model(want)
+        elif not ollama_models():
+            pull_model(model_for_pc())
         SETUP.update(stage="ready", pct=100, msg="Prêt !")
     except Exception as e:
         SETUP.update(stage="error", msg=str(e))
@@ -661,9 +672,10 @@ class H(BaseHTTPRequestHandler):
         p = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
         try:
             if self.path == "/api/setup":
-                if SETUP["stage"] in ("idle", "error"):
-                    SETUP.update(stage="engine", pct=1, msg="Démarrage…")
-                    threading.Thread(target=run_setup, daemon=True).start()
+                want = (p.get("model") or "").strip() or None
+                if SETUP["stage"] in ("idle", "error") or (want and SETUP["stage"] == "ready"):
+                    SETUP.update(stage="engine", pct=1, msg="Démarrage…", want=want or "")
+                    threading.Thread(target=run_setup, args=(want,), daemon=True).start()
                 return self.reply(SETUP)
             if self.path == "/api/detect":
                 return self.reply(autodetect(p.get("email", "")))
