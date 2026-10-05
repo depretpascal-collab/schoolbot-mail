@@ -181,12 +181,26 @@ def ai(system, user, max_tokens=2000):
                              "messages": [{"role": "system", "content": system},
                                           {"role": "user", "content": user}]}).encode(),
             headers={"content-type": "application/json"})
+        model = CFG.get("ollama_model") or "mistral"
         try:
             with urllib.request.urlopen(req, timeout=300) as r:
                 return json.load(r)["message"]["content"]
-        except urllib.error.URLError:
-            raise RuntimeError("IA locale introuvable : installez Ollama (ollama.com) puis lancez "
-                               "'ollama pull " + (CFG.get("ollama_model") or "mistral") + "'")
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                try:
+                    with urllib.request.urlopen((CFG.get("ollama_url") or "http://127.0.0.1:11434") + "/api/tags", timeout=5) as r:
+                        names = ", ".join(m["name"] for m in json.load(r).get("models", [])) or "aucun"
+                except Exception:
+                    names = "?"
+                raise RuntimeError("Le modèle '" + model + "' n'est pas (encore) téléchargé dans Ollama. "
+                                   "Modèles disponibles sur ce PC : " + names +
+                                   ". Corrigez le nom dans ⚙ « Modèle local », ou attendez la fin du téléchargement.")
+            raise RuntimeError("Erreur de l'IA locale (" + str(e.code) + ") : " + e.read().decode(errors="ignore")[:200])
+        except (TimeoutError, OSError) as e:
+            if "timed out" in str(e):
+                raise RuntimeError("L'IA locale met trop de temps à répondre : le modèle '" + model +
+                                   "' est sans doute trop lourd pour ce PC. Essayez un modèle plus léger.")
+            raise RuntimeError("Ollama ne répond pas : lancez l'application Ollama (icône lama près de l'horloge), puis réessayez.")
     return claude(system, user, max_tokens)
 
 
