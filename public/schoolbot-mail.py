@@ -11,7 +11,7 @@ from email import message_from_bytes
 from email.header import decode_header, make_header
 from email.message import EmailMessage
 from email.utils import parseaddr, make_msgid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 E = os.environ.get
 CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
@@ -291,41 +291,74 @@ def send(p):
 PAGE = """<!doctype html><html lang="fr"><meta charset="utf-8"><title>SchoolBot Mail</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-:root{--bg:#fff;--fg:#1d1d1f;--mut:#6b7280;--bd:#e5e7eb;--card:#f7f7f8;--ac:#2563eb}
-@media(prefers-color-scheme:dark){:root{--bg:#16161a;--fg:#ececf0;--mut:#9ca3af;--bd:#2c2c34;--card:#1e1e24;--ac:#60a5fa}}
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-header{display:flex;gap:12px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--bd)}
-header h1{font-size:17px;margin:0;flex:1}button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
-button.g{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
-#list{padding:16px 20px;max-width:900px;margin:auto}h2{font-size:14px;color:var(--mut);margin:22px 0 8px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 14px;margin-bottom:8px;cursor:pointer}
-.card:hover{border-color:var(--ac)}.card b{display:block}.card small{color:var(--mut)}
-#split{display:none;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 54px)}
-.pane{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:10px}.pane+.pane{border-left:1px solid var(--bd)}
-pre{white-space:pre-wrap;font:inherit;margin:0}textarea{flex:1;min-height:300px;font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;resize:none}
-#wiz{display:none;max-width:620px;margin:auto;padding:20px}#wiz label{display:block;font-size:13px;color:var(--mut);margin:12px 0 3px}
-input,select{width:100%;padding:8px 10px;font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px}
-.row{display:flex;gap:8px;align-items:center}@media(max-width:800px){#split{grid-template-columns:1fr;height:auto}}
+:root{--bg1:#0b0b3b;--bg2:#1c1474;--glass:rgba(255,255,255,.07);--glass2:rgba(255,255,255,.12);--bd:rgba(255,255,255,.14);--fg:#f2f1ff;--mut:#a9a6dd;--ac:#8b7bff;--ac2:#5b8cff;
+--red:#ff6b8a;--org:#ffb35c;--yel:#ffe066;--blu:#6fb7ff;--grn:#7ef0c0;--gry:#9b98c8}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif;color:var(--fg);
+background:radial-gradient(1200px 700px at 70% -10%,#3a2bd1 0%,transparent 60%),radial-gradient(900px 600px at 0% 100%,#2a1b8f 0%,transparent 60%),linear-gradient(160deg,var(--bg1),var(--bg2));background-attachment:fixed;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;
+background-image:radial-gradient(1px 1px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#fff,transparent),radial-gradient(1px 1px at 55% 35%,#fff,transparent),radial-gradient(1px 1px at 80% 15%,#fff,transparent),radial-gradient(1px 1px at 90% 80%,#fff,transparent),radial-gradient(1px 1px at 65% 90%,#fff,transparent),radial-gradient(1px 1px at 20% 90%,#fff,transparent)}
+header{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;padding:12px 24px;background:rgba(10,8,50,.55);backdrop-filter:blur(14px);border-bottom:1px solid var(--bd)}
+.brand{display:flex;align-items:center;gap:10px;flex:1;font-weight:700;font-size:17px}
+.brand small{font-weight:400;color:var(--mut);font-size:12px}.brand a{color:var(--ac)}
+.orb{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#cfc6ff 25%,#7a68ff 60%,#3a2bd1);box-shadow:0 0 22px #8b7bff}
+.orb.big{width:64px;height:64px;flex:none}.orb.pulse{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.08);box-shadow:0 0 44px #a99bff}}
+#who{color:var(--mut);font-size:13px}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:9px 16px;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 6px 20px -6px #7a68ff;transition:transform .15s,filter .15s}
+button:hover{filter:brightness(1.12);transform:translateY(-1px)}
+button.g{background:var(--glass);border:1px solid var(--bd);box-shadow:none}
+main{max-width:1100px;margin:auto;padding:28px 24px}
+.panel{background:var(--glass);border:1px solid var(--bd);border-radius:20px;padding:26px;backdrop-filter:blur(10px);animation:in .4s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.hero{display:flex;gap:18px;align-items:center}.hero h2{margin:0;font-size:26px}.hero p{margin:2px 0 0;color:var(--mut)}
+.bar{height:6px;border-radius:9px;background:var(--glass2);margin:22px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#fff,var(--ac));border-radius:9px;transition:width .4s}
+.count{text-align:right;font-weight:700;color:var(--fg)}
+h3.big{font-size:30px;line-height:1.15;margin:26px 0 18px}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.chip{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:14px;background:var(--glass);border:1px solid var(--bd);cursor:pointer;transition:.15s}
+.chip:hover{background:var(--glass2);border-color:var(--ac)}.chip b{font-size:20px}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+.layout{display:grid;grid-template-columns:230px 1fr;gap:20px}
+.side{display:flex;flex-direction:column;gap:6px}
+.side div{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer;color:var(--mut)}
+.side div:hover,.side div.on{background:var(--glass2);color:var(--fg)}.side span{margin-left:auto;font-weight:700}
+.mail{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;background:var(--glass);border:1px solid var(--bd);margin-bottom:10px;cursor:pointer;transition:.15s;animation:in .3s ease both}
+.mail:hover{border-color:var(--ac);background:var(--glass2)}.mail .dot{margin-top:8px}
+.mail b{display:block}.mail small{color:var(--mut)}.mail .tag{margin-left:auto;font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid currentColor;white-space:nowrap}
+.ready{font-size:11px;color:var(--grn);margin-top:4px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.label{font-size:12px;letter-spacing:.12em;font-weight:700;color:var(--mut);display:flex;align-items:center;gap:8px}
+pre{white-space:pre-wrap;font:inherit;margin:12px 0 0;color:#dcdaf7;max-height:65vh;overflow:auto}
+.reply{background:linear-gradient(160deg,rgba(139,123,255,.25),rgba(91,140,255,.12));border:1px solid rgba(160,150,255,.45);box-shadow:0 20px 60px -20px #6b5bff}
+textarea{width:100%;min-height:330px;margin-top:14px;font:inherit;line-height:1.6;color:var(--fg);background:rgba(0,0,0,.18);border:1px solid var(--bd);border-radius:14px;padding:16px;resize:vertical}
+textarea[readonly]{background:transparent;border-color:transparent}
+.note{font-size:12px;color:var(--mut);margin:8px 0 12px}
+.row{display:flex;gap:10px;align-items:center}.row .grow{flex:1}
+label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
+input,select{width:100%;padding:10px 12px;font:inherit;color:var(--fg);background:rgba(0,0,0,.2);border:1px solid var(--bd);border-radius:10px}
+select option{color:#000}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+#st,#wst{color:var(--mut);font-size:13px}
+@media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
 </style>
-<header><h1>📬 SchoolBot Mail <small style="font-weight:400;color:var(--mut);font-size:12px">offert par <a href="https://schoolbot.be" target="_blank" style="color:var(--ac)">SchoolBot.be</a></small></h1><button class="g" id="back" style="display:none" onclick="home()">← Liste</button><button class="g" onclick="gear()">⚙</button><button onclick="load()">Actualiser</button></header>
-<div id="list"></div>
-<div id="wiz"><h3>Connexion de votre boîte mail</h3><small style="color:var(--mut)">Paramètres fournis par votre service informatique ou votre PO. Ils restent sur cet ordinateur.</small>
-<div id="fields"></div><div class="row" style="margin-top:18px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst" style="color:var(--mut)"></p></div>
-<div id="split"><div class="pane"><b id="subj"></b><small id="meta"></small><pre id="orig"></pre></div>
-<div class="pane"><div class="row"><b style="flex:1">Réponse proposée</b><button class="g" onclick="redo()">↻ Regénérer</button></div>
-<textarea id="reply"></textarea><div class="row"><button onclick="sendIt()">Envoyer</button><small id="st"></small></div></div></div>
+<header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>offert par <a href="https://schoolbot.be" target="_blank">SchoolBot.be</a></small></div>
+<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button onclick="load()">Traiter mes mails</button></header>
+<main id="app"></main>
 <script>
-const $=s=>document.querySelector(s);let mails=[],cur=null;
-const CATS=[["urgent","🔴 Urgent"],["a_traiter","🟠 À traiter"],["a_lire","🔵 À lire"],["postposable","⚪ Postposable"]];
-function home(){$('#wiz').style.display='none';$('#split').style.display='none';$('#list').style.display='block';$('#back').style.display='none'}
-const F=[["email","Adresse e-mail"],["user","Identifiant de connexion (souvent l'adresse e-mail)"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
-function wizard(c){c=c||{};$('#list').style.display='none';$('#split').style.display='none';$('#wiz').style.display='block';$('#back').style.display='none';
- const f=$('#fields');f.textContent='';
- for(const[k,t,ty]of F){const l=document.createElement('label');l.textContent=t;let i;
+const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={};
+const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
+const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+function wizard(c){c=c||{};app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
+ const f=$('#fields');
+ for(const[k,t,ty]of F){const w=document.createElement('div');const l=document.createElement('label');l.textContent=t;let i;
   if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
-  else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale (Ollama) — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
+  else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
   else{i=document.createElement('input');i.type=ty||'text'}
-  i.id='f_'+k;if(c[k])i.value=c[k];f.append(l,i)}
+  i.id='f_'+k;if(c[k])i.value=c[k];w.append(l,i);f.append(w)}
  if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';if(!c.ollama_model)$('#f_ollama_model').value='mistral';$('#f_email').onblur=guess}
 async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$('#wst').textContent='Recherche des paramètres…';
  const r=await(await fetch('/api/detect',{method:'POST',body:JSON.stringify({email:e})})).json();if(r.error){$('#wst').textContent=r.error;return}
@@ -335,20 +368,36 @@ const vals=()=>Object.fromEntries(F.map(([k])=>[k,$('#f_'+k).value]));
 async function testIt(){$('#wst').textContent='Test en cours…';const r=await(await fetch('/api/test',{method:'POST',body:JSON.stringify(vals())})).json();$('#wst').textContent='Réception : '+r.imap+' · Envoi : '+r.smtp}
 async function saveIt(){await fetch('/api/config',{method:'POST',body:JSON.stringify(vals())});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
-async function load(){home();const c=await(await fetch('/api/config')).json();if(!c.configured||!c.has_key){wizard(c.cfg);return}
- $('#list').textContent="Lecture et analyse des mails du jour…";
- const r=await fetch('/api/mails');const j=await r.json();if(!Array.isArray(j)){$('#list').textContent="Erreur : "+j.error;return}
- mails=j;render()}
-function render(){const l=$('#list');l.textContent='';if(!mails.length){l.textContent="Aucun mail aujourd'hui.";return}
- for(const[c,t]of CATS){const ms=mails.filter(m=>m.category===c);if(!ms.length)continue;
-  const h=document.createElement('h2');h.textContent=t+' ('+ms.length+')';l.append(h);
-  for(const m of ms){const d=document.createElement('div');d.className='card';
-   d.innerHTML='<b></b><small></small>';d.children[0].textContent=m.subject;
-   d.children[1].textContent=m.from+' — '+m.summary;d.onclick=()=>openMail(m.id);l.append(d)}}}
-async function openMail(id){cur=mails.find(m=>m.id===id);$('#list').style.display='none';$('#split').style.display='grid';$('#back').style.display='';
- $('#subj').textContent=cur.subject;$('#meta').textContent=cur.from+' · '+cur.date;$('#orig').textContent=cur.body;$('#st').textContent='';redo()}
-async function redo(){$('#reply').value='Rédaction en cours…';
- const r=await fetch('/api/draft',{method:'POST',body:JSON.stringify({id:cur.id})});const j=await r.json();$('#reply').value=j.draft||('Erreur : '+j.error)}
+async function load(){const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';if(!c.configured||!c.has_key){wizard(c.cfg);return}
+ app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2 id="t">Je lis vos mails</h2><p id="s">Un par un. Qui écrit, pourquoi, et ce que ça demande de vous.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
+ let p=0;const tick=setInterval(()=>{p+=(92-p)*0.03;$('#bar').style.width=p+'%'},300);
+ const phr=['Je lis les sujets et les expéditeurs…','Je repère ce qui est urgent…','Je classe par catégorie…','Je résume chaque mail…'];let k=0;const pt=setInterval(()=>{$('#s').textContent=phr[k++%phr.length]},2600);
+ const r=await fetch('/api/mails');const j=await r.json();clearInterval(tick);clearInterval(pt);
+ if(!Array.isArray(j)){app.innerHTML='<div class="panel"><h2>Oups.</h2><p>'+esc(j.error)+'</p></div>';return}
+ mails=j;$('#bar').style.width='100%';$('#cnt').textContent=mails.length+' / '+mails.length;setTimeout(summary,500);prefetch()}
+function counts(){const c={};for(const m of mails)c[m.category]=(c[m.category]||0)+1;return c}
+function summary(){const c=counts();const urg=c.urgent||0;
+ let h='<div class="panel"><div class="hero"><div class="orb big"></div><div><h2>Compris.</h2><p>'+(urg?urg+' mail(s) urgent(s) vous attendent.':"Rien d'urgent qui vous attend. Tout a une place.")+'</p></div></div>';
+ h+='<h3 class="big">'+mails.length+' mails compris.<br>Voilà ce que ça donne :</h3><div class="chips">';
+ for(const[k,[,col,lab]]of Object.entries(CATS))if(c[k])h+='<div class="chip" onclick="list(&quot;'+k+'&quot;)"><span class="dot" style="color:'+col+';background:'+col+'"></span><b>'+c[k]+'</b> '+lab+'</div>';
+ h+='</div><div class="row" style="margin-top:22px"><span class="grow"></span><button onclick="list(c0())">Voir les mails →</button></div></div>';app.innerHTML=h}
+const c0=()=>Object.keys(CATS).find(k=>counts()[k])||null;
+function list(f){filter=f;const c=counts();
+ let h='<div class="layout"><div class="side">';
+ for(const[k,[lab,col]]of Object.entries(CATS))if(c[k])h+='<div class="'+(k===filter?'on':'')+'" onclick="list(&quot;'+k+'&quot;)"><span class="dot" style="color:'+col+';background:'+col+'"></span>'+lab+'<span>'+c[k]+'</span></div>';
+ h+='<div onclick="summary()" style="margin-top:10px">← Vue d’ensemble</div></div><div>';
+ for(const m of mails.filter(m=>m.category===filter)){const[lab,col]=CATS[m.category];
+  h+='<div class="mail" onclick="openMail(&quot;'+m.id+'&quot;)"><span class="dot" style="color:'+col+';background:'+col+'"></span><div><b>'+esc(name(m.from))+' · '+esc(m.subject)+'</b><small>'+esc(m.summary)+'</small>'+(m.draft?'<div class="ready">● Réponse prête</div>':'')+'</div><span class="tag" style="color:'+col+'">'+lab+'</span></div>'}
+ app.innerHTML=h+'</div></div>'}
+function getDraft(m){if(!m.p)m.p=fetch('/api/draft',{method:'POST',body:JSON.stringify({id:m.id})}).then(r=>r.json()).then(j=>{if(j.draft)m.draft=j.draft;else m.p=null;return j});return m.p}
+async function prefetch(){for(const m of mails.filter(m=>m.category==='urgent'||m.category==='repondre')){try{await getDraft(m)}catch(e){}}}
+async function openMail(id){cur=mails.find(m=>m.id===id);
+ app.innerHTML='<div class="row" style="margin-bottom:14px"><button class="g" onclick="list(filter)">← Retour</button></div><div class="split"><div class="panel"><div class="label">MAIL REÇU</div><h2 style="margin:8px 0 2px;font-size:20px">'+esc(cur.subject)+'</h2><small style="color:var(--mut)">'+esc(cur.from)+' · '+esc(cur.date)+'</small><pre>'+esc(cur.body)+'</pre></div>'+
+ '<div class="panel reply"><div class="label"><span class="dot" style="color:var(--yel);background:var(--yel)"></span>RÉPONSE PRÉPARÉE PAR L’IA</div><h2 style="margin:8px 0 2px;font-size:18px">Re: '+esc(cur.subject.replace(/^re: */i,''))+'</h2><small style="color:var(--mut)">À : '+esc(cur.from)+'</small>'+
+ '<textarea id="reply" readonly>Rédaction en cours…</textarea><div class="note">✦ Rédigée à partir de l’historique — vous validez, il envoie.</div><div class="row"><button class="g" onclick="edit()">✎ Modifier</button><button class="g" onclick="redo()">↻ Regénérer</button><button class="grow" onclick="sendIt()">✉ Envoyer</button></div><p id="st"></p></div></div>';
+ const j=await getDraft(cur);$('#reply').value=cur.draft||('Erreur : '+j.error)}
+function edit(){const t=$('#reply');t.readOnly=false;t.focus()}
+async function redo(){cur.p=null;cur.draft=null;$('#reply').value='Rédaction en cours…';const j=await getDraft(cur);$('#reply').value=cur.draft||('Erreur : '+j.error)}
 async function sendIt(){if(!confirm('Envoyer cette réponse à '+cur.reply_to+' ?'))return;$('#st').textContent='Envoi…';
  const r=await fetch('/api/send',{method:'POST',body:JSON.stringify({to:cur.reply_to,subject:cur.subject,body:$('#reply').value,message_id:cur.message_id})});
  const j=await r.json();$('#st').textContent=j.ok?'✅ Envoyé':'Erreur : '+j.error}
@@ -421,4 +470,4 @@ if __name__ == "__main__":
         import webbrowser; webbrowser.open("http://127.0.0.1:8765")
     except Exception:
         pass
-    HTTPServer(("127.0.0.1", 8765), H).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", 8765), H).serve_forever()
