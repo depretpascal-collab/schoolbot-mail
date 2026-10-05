@@ -17,6 +17,33 @@ E = os.environ.get
 CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
+# Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
+VERSION = "1.0"
+# Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
+GITHUB_REPO = ""
+
+
+def _vtuple(v):
+    return tuple(int(x) for x in re.findall(r"\d+", str(v))) or (0,)
+
+
+def check_update():
+    """Lit version.json sur GitHub. Seul un numéro de version est lu : aucune donnée n'est envoyée."""
+    res = {"current": VERSION, "available": False}
+    if not GITHUB_REPO:
+        return res
+    try:
+        url = "https://raw.githubusercontent.com/%s/main/version.json" % GITHUB_REPO
+        with urllib.request.urlopen(url, timeout=5) as r:
+            info = json.loads(r.read().decode("utf-8"))
+        latest = str(info.get("version", ""))
+        res.update(latest=latest, notes=info.get("notes", ""),
+                   url=info.get("url") or "https://github.com/%s/releases/latest" % GITHUB_REPO,
+                   available=_vtuple(latest) > _vtuple(VERSION))
+    except Exception:
+        pass
+    return res
+
 
 def load_cfg():
     global CFG
@@ -388,9 +415,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>offert par <a href="https://schoolbot.be" target="_blank">SchoolBot.be</a></small></div>
 <span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button onclick="load()">Traiter mes mails</button></header>
+<div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
 <script>
 const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={};
+fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
+ b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.style.display=\'none\';return false">Plus tard</a>'}).catch(()=>{});
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
@@ -614,6 +644,8 @@ class H(BaseHTTPRequestHandler):
             return self.reply(setup_status())
         if self.path == "/api/models":
             return self.reply({"models": ollama_models(), "recommended": pick_model()})
+        if self.path == "/api/update":
+            return self.reply(check_update())
         if self.path == "/api/mails":
             try:
                 ms = fetch_today()
