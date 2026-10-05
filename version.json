@@ -1,4 +1,4 @@
 {
-  "version": "1.3",
-  "notes": "Correction : message « Failed to remove temporary directory » à la fermeture."
+  "version": "1.4",
+  "notes": "Connexion Microsoft 365 avec votre compte, sans mot de passe à donner à l'application."
 }
