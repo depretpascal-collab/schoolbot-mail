@@ -484,7 +484,8 @@ def ram_gb():
 
 def model_for_pc():
     g = ram_gb()
-    return "mistral-small" if g >= 30 else "mistral-nemo" if g >= 15 else "llama3.2"
+    # mistral-small = qualité de français exigée ; dès 16 Go (Windows en rapporte ~15,8)
+    return "mistral-small" if g >= 15 else "mistral-nemo"
 
 
 def ollama_up():
