@@ -37,7 +37,7 @@ function Index() {
             <a href="https://github.com/depretpascal-collab/schoolbot-mail/releases/latest/download/SchoolBot-Mail-Windows.zip">Télécharger pour Windows (gratuit)</a>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <a href="https://github.com/depretpascal-collab/clever-mailbox-helper/releases/latest/download/SchoolBot-Mail-Mac.zip">Pour Mac</a>
+            <a href="https://github.com/depretpascal-collab/schoolbot-mail/releases/latest/download/SchoolBot-Mail-Mac.zip">Pour Mac</a>
           </Button>
           <Button asChild size="lg" variant="outline">
             <a href="https://schoolbot.be" target="_blank" rel="noreferrer">Découvrir SchoolBot</a>
