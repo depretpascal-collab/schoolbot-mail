@@ -394,15 +394,21 @@ const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,f
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
-const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)","model"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+async function fillModels(sel,cur){sel.add(new Option('Automatique — le meilleur modèle installé','auto'));
+ try{const r=await(await fetch('/api/models')).json();
+  for(const m of r.models)sel.add(new Option(m+(m===r.recommended?' — conseillé':''),m))}
+ catch(e){for(const m of['mistral-small','mistral-nemo','mistral','llama3.2'])sel.add(new Option(m,m))}
+ sel.value=(cur&&[...sel.options].some(o=>o.value===cur))?cur:'auto'}
 function wizard(c){c=c||{};app.innerHTML='<div class="panel" style="max-width:720px;margin:auto"><div class="hero"><div class="orb big"></div><div><h2>Connectons votre boîte mail</h2><p>Paramètres fournis par votre service informatique. Ils restent sur cet ordinateur.</p></div></div><div class="grid2" id="fields"></div><div class="row" style="margin-top:20px"><button class="g" onclick="testIt()">Tester la connexion</button><button onclick="saveIt()">Enregistrer et commencer</button></div><p id="wst"></p></div>';
  const f=$('#fields');
  for(const[k,t,ty]of F){const w=document.createElement('div');const l=document.createElement('label');l.textContent=t;let i;
   if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
   else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
+  else if(ty==='model'){i=document.createElement('select');fillModels(i,c[k])}
   else{i=document.createElement('input');i.type=ty||'text'}
-  i.id='f_'+k;if(c[k])i.value=c[k];w.append(l,i);f.append(w)}
- if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';if(!c.ollama_model)$('#f_ollama_model').value='mistral';$('#f_email').onblur=guess}
+  i.id='f_'+k;if(ty!=='model'&&c[k])i.value=c[k];w.append(l,i);f.append(w)}
+ if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess}
 async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$('#wst').textContent='Recherche des paramètres…';
  const r=await(await fetch('/api/detect',{method:'POST',body:JSON.stringify({email:e})})).json();if(r.error){$('#wst').textContent=r.error;return}
  for(const k of['user','imap_host','imap_port','imap_sec','smtp_host','smtp_port','smtp_sec'])if(r[k])$('#f_'+k).value=r[k];
