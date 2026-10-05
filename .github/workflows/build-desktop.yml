@@ -1,0 +1,33 @@
+name: Construire SchoolBot Mail (Windows + Mac)
+on:
+  push:
+    paths: ["public/schoolbot-mail.py", ".github/workflows/build-desktop.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyinstaller pywebview
+      - name: Windows .exe
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --onefile --windowed --name "SchoolBot Mail" public/schoolbot-mail.py
+          Compress-Archive -Path "dist/SchoolBot Mail.exe" -DestinationPath SchoolBot-Mail-Windows.zip
+      - name: Mac .app
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --windowed --name "SchoolBot Mail" public/schoolbot-mail.py
+          cd dist && ditto -c -k --keepParent "SchoolBot Mail.app" ../SchoolBot-Mail-Mac.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: SchoolBot Mail - dernière version
+          files: SchoolBot-Mail-*.zip
