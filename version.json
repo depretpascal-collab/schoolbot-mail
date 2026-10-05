@@ -1,4 +1,4 @@
 {
-  "version": "1.1",
-  "notes": "Nouveau : télécharger un autre modèle d'IA directement depuis les réglages."
+  "version": "1.2",
+  "notes": "Correction : l'écran restait vide au démarrage."
 }
