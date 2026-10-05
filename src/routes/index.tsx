@@ -16,26 +16,11 @@ export const Route = createFileRoute("/")({
 });
 
 const steps = [
-  ["Installez Python", "Gratuit, depuis python.org (cochez « Add to PATH »)."],
-  ["Installez l'IA locale", "Ollama (ollama.com), puis la commande : ollama pull mistral-small. Le programme choisit le meilleur modèle installé."],
-  ["Lancez SchoolBot Mail", "Double-cliquez sur le fichier : le navigateur s'ouvre tout seul."],
+  ["Téléchargez et décompressez", "Récupérez le fichier zip, puis décompressez-le (clic droit → « Extraire tout »)."],
+  ["Double-cliquez sur SchoolBot Mail", "Windows peut afficher un écran bleu de sécurité : cliquez sur « Informations complémentaires », puis « Exécuter quand même »."],
+  ["Laissez l'assistant travailler", "L'IA s'installe et se prépare toute seule, sans aucune commande à taper."],
   ["Tapez votre adresse", "Les serveurs sont trouvés automatiquement. Ajoutez le mot de passe, testez, c'est parti."],
 ];
-
-async function download() {
-  // Le fichier est récupéré par la page puis enregistré localement : évite le blocage
-  // des téléchargements directs dans l'aperçu protégé.
-  const res = await fetch("/schoolbot-mail.py", { credentials: "include" });
-  const blob = new Blob([await res.text()], { type: "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "schoolbot-mail.py";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 function Index() {
   return (
@@ -48,7 +33,12 @@ function Index() {
           déjà rédigée. Tout se passe sur votre ordinateur : aucun mail n'en sort.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button size="lg" onClick={download}>Télécharger (gratuit)</Button>
+          <Button asChild size="lg">
+            <a href="https://github.com/depretpascal-collab/clever-mailbox-helper/releases/latest/download/SchoolBot-Mail-Windows.zip">Télécharger pour Windows (gratuit)</a>
+          </Button>
+          <Button asChild size="lg" variant="outline">
+            <a href="https://github.com/depretpascal-collab/clever-mailbox-helper/releases/latest/download/SchoolBot-Mail-Mac.zip">Pour Mac</a>
+          </Button>
           <Button asChild size="lg" variant="outline">
             <a href="https://schoolbot.be" target="_blank" rel="noreferrer">Découvrir SchoolBot</a>
           </Button>
