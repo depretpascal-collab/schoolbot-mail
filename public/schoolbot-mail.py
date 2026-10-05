@@ -93,8 +93,8 @@ def body_of(msg):
     return html.unescape(re.sub(r"<[^>]+>", "", t)).strip()
 
 
-def fetch_today(limit=40):
-    d = datetime.date.today()
+def fetch_today(limit=60):
+    d = datetime.date.today() - datetime.timedelta(days=7)  # les 7 derniers jours
     since = f"{d.day:02d}-{MONTHS[d.month - 1]}-{d.year}"
     M = imap_connect()
     M.select("INBOX", readonly=True)  # lecture seule : rien n'est marqué comme lu
