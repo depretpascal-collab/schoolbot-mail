@@ -7,7 +7,7 @@ export const Route = createFileRoute("/")({
       { title: "SchoolBot Mail — votre boîte mail triée par IA, sur votre PC" },
       { name: "description", content: "Logiciel gratuit pour directions et secrétariats d'écoles : tri des mails et réponses proposées par IA, sans que vos mails quittent l'ordinateur." },
       { property: "og:title", content: "SchoolBot Mail — tri des mails par IA, en local" },
-      { property: "og:description", content: "Gratuit, installé sur votre PC, vos mails ne le quittent jamais. Offert par SchoolBot.be." },
+      { property: "og:description", content: "Gratuit, installé sur votre PC, vos mails ne le quittent jamais. Développé par Educlan Asbl." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -26,7 +26,7 @@ function Index() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto max-w-3xl px-6 py-20">
-        <p className="text-sm text-muted-foreground">Offert par SchoolBot.be</p>
+        <p className="text-sm text-muted-foreground">Développé par Educlan Asbl</p>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">SchoolBot Mail</h1>
         <p className="mt-4 text-lg text-muted-foreground">
           Chaque matin, vos mails du jour triés en Urgent, À traiter, À lire, Postposable — avec une réponse
