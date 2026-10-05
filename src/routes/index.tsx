@@ -17,7 +17,7 @@ export const Route = createFileRoute("/")({
 
 const steps = [
   ["Installez Python", "Gratuit, depuis python.org (cochez « Add to PATH »)."],
-  ["Installez l'IA locale", "Ollama (ollama.com), puis la commande : ollama pull mistral"],
+  ["Installez l'IA locale", "Ollama (ollama.com), puis la commande : ollama pull mistral-small. Le programme choisit le meilleur modèle installé."],
   ["Lancez SchoolBot Mail", "Double-cliquez sur le fichier : le navigateur s'ouvre tout seul."],
   ["Tapez votre adresse", "Les serveurs sont trouvés automatiquement. Ajoutez le mot de passe, testez, c'est parti."],
 ];
