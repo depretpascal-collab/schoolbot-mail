@@ -26,7 +26,7 @@ GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 # ---------- Microsoft 365 : on se connecte avec son compte, l'app ne voit jamais le mot de passe ----------
 # Identifiant de l'application à créer une seule fois dans Microsoft Entra (gratuit).
 # Une fois renseigné ici, tous les utilisateurs en bénéficient sans rien configurer.
-MS_CLIENT_ID = ""
+MS_CLIENT_ID = "c8709070-62f6-435d-9e86-e90b28778bd9"
 MS_SCOPE = "https://graph.microsoft.com/.default offline_access"
 MS_AUTH = "https://login.microsoftonline.com/common/oauth2/v2.0"
 MS_API = "https://graph.microsoft.com/v1.0"
