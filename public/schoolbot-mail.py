@@ -19,14 +19,14 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.4"
+VERSION = "1.5"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
 # ---------- Microsoft 365 : on se connecte avec son compte, l'app ne voit jamais le mot de passe ----------
 # Identifiant de l'application à créer une seule fois dans Microsoft Entra (gratuit).
 # Une fois renseigné ici, tous les utilisateurs en bénéficient sans rien configurer.
-MS_CLIENT_ID = "c8709070-62f6-435d-9e86-e90b28778bd9"
+MS_CLIENT_ID = "7659db28-79ec-47b1-b055-a36d3394e682"
 MS_SCOPE = "https://graph.microsoft.com/.default offline_access"
 MS_AUTH = "https://login.microsoftonline.com/common/oauth2/v2.0"
 MS_API = "https://graph.microsoft.com/v1.0"
