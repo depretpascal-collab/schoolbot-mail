@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.6"
+VERSION = "1.7"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
