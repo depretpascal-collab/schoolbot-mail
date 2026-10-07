@@ -1,0 +1,38 @@
+SCHOOLBOT MAIL — MODE D'EMPLOI DE L'INSTALLATION
+=================================================
+
+Développé par Educlan Asbl — https://schoolbot.be
+
+
+INSTALLATION (3 étapes)
+-----------------------
+1. Cliquez droit sur le fichier ZIP téléchargé, puis « Extraire tout… »
+   (laissez le dossier proposé, ou choisissez Documents).
+
+2. Ouvrez le dossier extrait, puis double-cliquez sur :
+        Installer SchoolBot Mail
+   Le programme s'installe automatiquement dans C:\SchoolBotMail
+   et un raccourci « SchoolBot Mail » est créé sur le Bureau.
+
+3. SchoolBot Mail démarre tout seul. À la première installation,
+   l'assistant vous guide pour connecter votre boîte mail et
+   télécharger le moteur IA local (environ 1,5 Go).
+
+
+MISES À JOUR
+------------
+Téléchargez le nouveau ZIP, extrayez-le, puis relancez simplement
+« Installer SchoolBot Mail » : il remplace l'ancienne version dans
+C:\SchoolBotMail. Vos réglages (compte, modèle IA, signature) sont
+conservés : ils ne sont pas stockés dans ce dossier.
+
+
+ASTUCES
+-------
+- Évitez d'extraire dans le Bureau s'il est synchronisé par OneDrive
+  (synchro en attente = blocages). Documents est un bon choix.
+- Ne lancez jamais le programme directement depuis le ZIP :
+  il faut toujours extraire d'abord.
+- Windows (SmartScreen) peut afficher un avertissement la première
+  fois : cliquez « Informations complémentaires » puis
+  « Exécuter quand même ».
