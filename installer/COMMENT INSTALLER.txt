@@ -1,0 +1,43 @@
+COMMENT INSTALLER SCHOOLBOT MAIL
+Développé par Educlan Asbl - schoolbot.be
+
+
+1. EXTRAIRE
+
+   Clic droit sur le fichier téléchargé (le .zip),
+   puis « Extraire tout ». Gardez le dossier proposé.
+   Ne lancez jamais le programme directement dans le .zip.
+
+
+2. INSTALLER
+
+   Ouvrez le dossier qui vient d'être créé.
+   Double-cliquez sur « Installer SchoolBot Mail ».
+   Attendez quelques secondes.
+
+
+3. DEMARRER
+
+   Une icône « SchoolBot Mail » apparaît sur votre Bureau.
+   Double-cliquez dessus pour ouvrir votre assistant mail.
+
+   A la premiere ouverture, un assistant vous aide à vous
+   connecter à votre boite mail. La premiere installation
+   peut prendre quelques minutes : laissez la fenêtre ouverte.
+
+
+CHANGER DE VERSION
+
+   Téléchargez le nouveau fichier, extrayez-le, puis
+   double-cliquez de nouveau sur « Installer SchoolBot Mail ».
+   Vos réglages (compte, signature) sont conservés.
+
+
+SI WINDOWS AFFICHE UN AVERTISSEMENT (première fois seulement)
+
+   Cliquez sur « Plus d'infos », puis sur « Exécuter quand même ».
+
+
+UN SOUCI ?
+
+   Ecrivez à contact@educlan.org
