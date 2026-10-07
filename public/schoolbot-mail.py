@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.8"
+VERSION = "1.9"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -678,9 +678,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
 <script>
+setInterval(()=>fetch('/api/ping').catch(()=>{}),5000);fetch('/api/ping');addEventListener('pagehide',()=>navigator.sendBeacon('/api/bye','{}'));
 const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={},msFound=0;
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
- b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.remove();return false">Plus tard</a>'}).catch(()=>{});
+ b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank" onclick="setTimeout(()=>{fetch(\'/api/quit\',{method:\'POST\',body:\'{}\'});document.body.innerHTML=\'<p style=&quot;padding:40px;font-size:18px&quot;>SchoolBot Mail est fermé pour permettre la mise à jour. Vous pouvez fermer cette fenêtre.</p>\'},1500)"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.remove();return false">Plus tard</a>'}).catch(()=>{});
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
@@ -940,6 +941,9 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if self.path == "/api/ping":
+            LIFE.update(last=time.time(), bye=0)
+            return self.reply({"ok": True})
         if self.path == "/":
             return self.reply(PAGE, ctype="text/html")
         if self.path == "/api/config":
@@ -969,6 +973,13 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
+        if self.path == "/api/bye":
+            LIFE["bye"] = time.time()
+            return self.reply({"ok": True})
+        if self.path == "/api/quit":
+            self.reply({"ok": True})
+            threading.Timer(0.5, lambda: os._exit(0)).start()
+            return
         try:
             if self.path == "/api/setup":
                 want = (p.get("model") or "").strip() or None
@@ -1025,6 +1036,20 @@ class H(BaseHTTPRequestHandler):
         self.reply({"error": "not found"}, 404)
 
 
+LIFE = {"last": 0, "bye": 0}
+
+
+def watchdog():
+    """Arrête complètement le programme quand la fenêtre est fermée."""
+    while True:
+        time.sleep(3)
+        now = time.time()
+        if LIFE["bye"] and now - LIFE["bye"] > 8 and LIFE["last"] < LIFE["bye"]:
+            os._exit(0)  # page fermée et pas rouverte
+        if LIFE["last"] and now - LIFE["last"] > 180:
+            os._exit(0)  # plus aucun signe de vie de la fenêtre
+
+
 if __name__ == "__main__":
     URL = "http://127.0.0.1:8765"
     try:
@@ -1038,8 +1063,10 @@ if __name__ == "__main__":
         import webview  # fenêtre propre à l'application (version .exe / .app)
         webview.create_window("SchoolBot Mail", URL, width=1280, height=860, min_size=(900, 600))
         webview.start()
+        os._exit(0)  # fenêtre fermée : on arrête tout
     except Exception:
         import webbrowser; webbrowser.open(URL)
+        threading.Thread(target=watchdog, daemon=True).start()
         try:
             while True: time.sleep(3600)
         except KeyboardInterrupt:
