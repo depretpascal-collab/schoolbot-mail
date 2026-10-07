@@ -1,7 +1,7 @@
 name: Construire SchoolBot Mail (Windows + Mac)
 on:
   push:
-    paths: ["public/schoolbot-mail.py", ".github/workflows/build-desktop.yml"]
+    paths: ["public/schoolbot-mail.py", ".github/workflows/build-desktop.yml", "installer/**"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,7 +20,8 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           pyinstaller --onedir --windowed --name "SchoolBot Mail" public/schoolbot-mail.py
-          Compress-Archive -Path "dist/SchoolBot Mail","installer/Installer SchoolBot Mail.bat","installer/LISEZMOI.txt" -DestinationPath SchoolBot-Mail-Windows.zip
+          pyinstaller --onefile --noconsole --name "Installer SchoolBot Mail" installer/installer.py
+          Compress-Archive -Path "dist/SchoolBot Mail","dist/Installer SchoolBot Mail.exe","installer/COMMENT INSTALLER.txt" -DestinationPath SchoolBot-Mail-Windows.zip
       - name: Mac .app
         if: runner.os == 'macOS'
         run: |
