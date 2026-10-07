@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.7"
+VERSION = "1.8"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -133,6 +133,14 @@ def strip_html(t):
     t = re.sub(r"(?is)<(script|style).*?</\1>", "", t or "")
     t = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", t)
     return html.unescape(re.sub(r"<[^>]+>", "", t)).strip()
+
+
+def scan_days():
+    """Nombre de jours de mails à analyser (réglage utilisateur, 1 à 7, défaut 2)."""
+    try:
+        return max(1, min(7, int(CFG.get("days") or 2)))
+    except (TypeError, ValueError):
+        return 2
 
 
 def fetch_today(limit=60):
@@ -365,7 +373,7 @@ def ms_date(iso):
 
 
 def graph_messages(limit=60):
-    """Lit les 7 derniers jours de la boîte via Microsoft (sans jamais demander de mot de passe)."""
+    """Lit les derniers jours de la boîte via Microsoft (sans jamais demander de mot de passe)."""
     since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=scan_days())).strftime("%Y-%m-%dT%H:%M:%SZ")
     q = urllib.parse.urlencode({"$top": limit, "$orderby": "receivedDateTime desc",
                                 "$select": "id,from,receivedDateTime,subject,bodyPreview,conversationId,internetMessageId",
@@ -695,7 +703,7 @@ function wizard(c){c=c||{};msFound=0;app.innerHTML='<div class="panel" style="ma
   else if(ty==='days'){i=document.createElement('input');i.type='number';i.min='1';i.max='7';i.step='1'}
   else{i=document.createElement('input');i.type=ty||'text'}
   i.id='f_'+k;if(ty!=='model'&&c[k])i.value=c[k];w.append(l,i);f.append(w)}
- if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess;
+ if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';if(!c.days)$('#f_days').value='2';$('#f_email').onblur=guess;
  if(c.ms)msLogged(c)}
 function msLogged(c){msFound=1;const z=$('#mszone');z.style.display='block';
  z.innerHTML='<div class="msbox">Compte Microsoft connecté : <b>'+esc(c.ms_email||c.email||'')+'</b>'+
