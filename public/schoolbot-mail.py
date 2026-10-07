@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.6"
+VERSION = "1.7"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -195,6 +195,8 @@ def autodetect(email):
     if "@" not in email:
         return {"error": "adresse invalide"}
     dom = email.split("@")[1].lower().strip()
+    if dom in ("gmail.com", "googlemail.com"):
+        return dict(KNOWN["google"], user=email, source="Google")
     for url in (f"https://autoconfig.{dom}/mail/config-v1.1.xml?emailaddress={email}",
                 f"https://{dom}/.well-known/autoconfig/mail/config-v1.1.xml",
                 f"https://autoconfig.thunderbird.net/v1.1/{dom}"):
@@ -700,8 +702,16 @@ function msLogged(c){msFound=1;const z=$('#mszone');z.style.display='block';
 async function guess(){const e=$('#f_email').value;if(!e.includes('@'))return;$('#wst').textContent='Recherche des paramètres…';
  const r=await(await fetch('/api/detect',{method:'POST',body:JSON.stringify({email:e})})).json();if(r.error){$('#wst').textContent=r.error;return}
  for(const k of['user','imap_host','imap_port','imap_sec','smtp_host','smtp_port','smtp_sec'])if(r[k])$('#f_'+k).value=r[k];
- if((r.source||'').indexOf('Microsoft')>=0){msAsk();return}
- $('#wst').textContent=r.source==='supposition'?'Paramètres supposés : vérifiez-les avec « Tester la connexion ».':'Paramètres trouvés ('+r.source+'). Entrez le mot de passe puis testez.'}
+  if((r.source||'').indexOf('Microsoft')>=0){msAsk();return}
+  if((r.source||'').indexOf('Google')>=0){gmailHelp();return}
+  $('#wst').textContent=r.source==='supposition'?'Paramètres supposés : vérifiez-les avec « Tester la connexion ».':'Paramètres trouvés ('+r.source+'). Entrez le mot de passe puis testez.'}
+function gmailHelp(){const z=$('#mszone');z.style.display='block';
+ z.innerHTML='<div class="msbox"><b>Votre boîte est chez Google (Gmail).</b><p style="margin:6px 0 10px;color:var(--mut)">Google refuse votre mot de passe habituel pour un programme comme SchoolBot Mail. Il faut un <b>mot de passe d\u2019application</b>, une seule fois :</p>'+
+ '<ol style="margin:0 0 12px 18px;color:var(--mut);font-size:14px;line-height:1.6"><li>Activez la validation en deux étapes sur <a href="https://myaccount.google.com/security" target="_blank">myaccount.google.com/security</a></li>'+
+ '<li>Ouvrez <a href="https://myaccount.google.com/apppasswords" target="_blank">myaccount.google.com/apppasswords</a> et créez un mot de passe nommé « SchoolBot Mail »</li>'+
+ '<li>Collez le code de 16 lettres dans le champ <b>Mot de passe</b> ci-dessous, puis testez la connexion</li></ol>'+
+ '<p style="margin:0;color:var(--mut);font-size:13px">Votre mot de passe habituel ne change pas : il sert toujours à consulter vos mails. Si l\u2019option est absente, l\u2019administrateur Google de votre école doit l\u2019autoriser.</p></div>';
+ $('#wst').textContent='Paramètres Gmail remplis. Créez le mot de passe d\u2019application (voir ci-dessus) puis testez.'}
 function msAsk(){msFound=1;const z=$('#mszone');z.style.display='block';
  z.innerHTML='<div class="msbox"><b>Votre boîte est chez Microsoft 365.</b><p style="margin:6px 0 14px;color:var(--mut)">Le plus simple : connectez-vous avec votre compte habituel. SchoolBot Mail ne verra jamais votre mot de passe.</p>'+
  '<div class="row"><button onclick="msGo()">Se connecter avec Microsoft</button><button class="g" onclick="msHide()">Ou saisir un mot de passe</button></div><p id="msmsg"></p></div>'}
