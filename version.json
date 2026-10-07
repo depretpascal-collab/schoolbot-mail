@@ -1,4 +1,4 @@
 {
   "version": "1.9",
-  "notes": "Réglage du nombre de jours de mails à analyser (1 à 7, 2 par défaut)."
+  "notes": "Le programme se ferme complètement avec sa fenêtre ; la mise à jour ferme l’ancienne version automatiquement."
 }

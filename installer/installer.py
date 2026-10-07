@@ -34,6 +34,13 @@ def dossier_installation():
         return alternatif
 
 
+def fermer_ancienne_version():
+    """Ferme SchoolBot Mail s'il tourne encore, pour pouvoir le remplacer."""
+    subprocess.run(["taskkill", "/F", "/IM", APP + ".exe"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NOWINDOW)
+    import time; time.sleep(1.5)
+
+
 def copier(src, dest):
     shutil.copytree(src, dest, dirs_exist_ok=True)
 
@@ -73,6 +80,7 @@ def main():
         lancer(dest)
         return
 
+    fermer_ancienne_version()
     try:
         copier(src, dest)
     except OSError:
