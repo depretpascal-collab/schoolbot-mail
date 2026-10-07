@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.5"
+VERSION = "1.6"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -664,7 +664,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 @media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
-<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button onclick="load()">Traiter mes mails</button></header>
+<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
 <script>
@@ -721,6 +721,8 @@ async function saveIt(){const v=vals();let dl=null;if((v.ollama_model||'').start
  await fetch('/api/config',{method:'POST',body:JSON.stringify(v)});
  if(dl)await fetch('/api/setup',{method:'POST',body:JSON.stringify({model:dl})});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
+async function logout(){if(!confirm('Se déconnecter de ce compte mail ? Vos réglages IA et votre signature seront conservés.'))return;
+ await fetch('/api/logout',{method:'POST',body:'{}'});cfg={};$('#who').textContent='';$('#btnout').style.display='none';wizard({})}
 async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.stage==='ready')return true;
  app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2>Préparation de votre assistant</h2><p id="sm">'+(s.want?'SchoolBot Mail télécharge le modèle <b>'+esc(s.want)+'</b>. Vos mails ne quittent pas cet ordinateur. Selon la connexion, comptez quelques minutes.':'Une seule fois : SchoolBot Mail installe son intelligence artificielle sur cet ordinateur. Vos mails ne le quitteront jamais. Comptez 10 à 20 minutes.')+'</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  s=await(await fetch('/api/setup',{method:'POST',body:'{}'})).json();
@@ -728,7 +730,7 @@ async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.
   if(s.stage==='error'){$('#cnt').innerHTML=esc(s.msg)+' <button onclick="load()">Réessayer</button>';return false}
   await new Promise(r=>setTimeout(r,1000));s=await(await fetch('/api/setup')).json()}
  return true}
-async function load(){if(!await setupScreen())return;const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';if(!c.configured||!c.has_key){wizard(c.cfg);return}
+async function load(){if(!await setupScreen())return;const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';$('#btnout').style.display=c.configured?'':'none';if(!c.configured||!c.has_key){wizard(c.cfg);return}
  app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2 id="t">Je lis vos mails</h2><p id="s">Un par un. Qui écrit, pourquoi, et ce que ça demande de vous.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  let p=0;const tick=setInterval(()=>{p+=(92-p)*0.03;$('#bar').style.width=p+'%'},300);
  const phr=['Je lis les sujets et les expéditeurs…','Je repère ce qui est urgent…','Je classe par catégorie…','Je résume chaque mail…'];let k=0;const pt=setInterval(()=>{$('#s').textContent=phr[k++%phr.length]},2600);
@@ -977,6 +979,15 @@ class H(BaseHTTPRequestHandler):
                 return self.reply(res)
             if self.path == "/api/config":
                 save_cfg({k: v for k, v in p.items() if v != ""})
+                return self.reply({"ok": True})
+            if self.path == "/api/logout":
+                for k in ("email", "user", "pass", "imap_host", "imap_port", "imap_sec",
+                          "smtp_host", "smtp_port", "smtp_sec", "provider",
+                          "ms_access", "ms_refresh", "ms_expiry", "ms_email"):
+                    CFG.pop(k, None)
+                save_cfg({})
+                MS.update(state="idle", user_code="", msg="")
+                MAILS.clear()
                 return self.reply({"ok": True})
             if self.path == "/api/open":
                 m = MAILS.get(str(p.get("id")))
