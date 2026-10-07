@@ -730,7 +730,7 @@ async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.
   if(s.stage==='error'){$('#cnt').innerHTML=esc(s.msg)+' <button onclick="load()">Réessayer</button>';return false}
   await new Promise(r=>setTimeout(r,1000));s=await(await fetch('/api/setup')).json()}
  return true}
-async function load(){if(!await setupScreen())return;const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';if(!c.configured||!c.has_key){wizard(c.cfg);return}
+async function load(){if(!await setupScreen())return;const c=await(await fetch('/api/config')).json();cfg=c.cfg||{};$('#who').textContent=cfg.email||'';$('#btnout').style.display=c.configured?'':'none';if(!c.configured||!c.has_key){wizard(c.cfg);return}
  app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2 id="t">Je lis vos mails</h2><p id="s">Un par un. Qui écrit, pourquoi, et ce que ça demande de vous.</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  let p=0;const tick=setInterval(()=>{p+=(92-p)*0.03;$('#bar').style.width=p+'%'},300);
  const phr=['Je lis les sujets et les expéditeurs…','Je repère ce qui est urgent…','Je classe par catégorie…','Je résume chaque mail…'];let k=0;const pt=setInterval(()=>{$('#s').textContent=phr[k++%phr.length]},2600);
@@ -979,6 +979,15 @@ class H(BaseHTTPRequestHandler):
                 return self.reply(res)
             if self.path == "/api/config":
                 save_cfg({k: v for k, v in p.items() if v != ""})
+                return self.reply({"ok": True})
+            if self.path == "/api/logout":
+                for k in ("email", "user", "pass", "imap_host", "imap_port", "imap_sec",
+                          "smtp_host", "smtp_port", "smtp_sec", "provider",
+                          "ms_access", "ms_refresh", "ms_expiry", "ms_email"):
+                    CFG.pop(k, None)
+                save_cfg({})
+                MS.update(state="idle", user_code="", msg="")
+                MAILS.clear()
                 return self.reply({"ok": True})
             if self.path == "/api/open":
                 m = MAILS.get(str(p.get("id")))
