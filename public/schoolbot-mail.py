@@ -138,7 +138,7 @@ def strip_html(t):
 def fetch_today(limit=60):
     if is_ms():
         return graph_messages(limit)
-    d = datetime.date.today() - datetime.timedelta(days=7)  # les 7 derniers jours
+    d = datetime.date.today() - datetime.timedelta(days=scan_days())
     since = f"{d.day:02d}-{MONTHS[d.month - 1]}-{d.year}"
     M = imap_connect()
     M.select("INBOX", readonly=True)  # lecture seule : rien n'est marqué comme lu
@@ -366,7 +366,7 @@ def ms_date(iso):
 
 def graph_messages(limit=60):
     """Lit les 7 derniers jours de la boîte via Microsoft (sans jamais demander de mot de passe)."""
-    since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=scan_days())).strftime("%Y-%m-%dT%H:%M:%SZ")
     q = urllib.parse.urlencode({"$top": limit, "$orderby": "receivedDateTime desc",
                                 "$select": "id,from,receivedDateTime,subject,bodyPreview,conversationId,internetMessageId",
                                 "$filter": "receivedDateTime ge " + since})
@@ -676,7 +676,7 @@ fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
-const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)","model"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
+const F=[["email","Adresse e-mail"],["user","Identifiant de connexion"],["pass","Mot de passe","password"],["imap_host","Serveur entrant (IMAP)"],["imap_port","Port IMAP"],["imap_sec","Sécurité IMAP","sec"],["smtp_host","Serveur sortant (SMTP)"],["smtp_port","Port SMTP"],["smtp_sec","Sécurité SMTP","sec"],["days","Jours de mails à analyser (1 à 7)","days"],["ai","Intelligence artificielle","ai"],["ollama_model","Modèle local (Ollama)","model"],["api_key","Clé API Anthropic (seulement si IA Claude)","password"],["signature","Signature des réponses"]];
 const CATALOG=[['mistral-small','meilleur français, 16 Go de mémoire conseillés (~14 Go)'],['mistral-nemo','bon français, 8-16 Go (~7 Go)'],['gemma2:9b','correct, 8 Go (~5 Go)'],['llama3.2','léger, PC modeste (~2 Go)'],['mistral','très léger, français moyen (~4 Go)']];
 async function fillModels(sel,cur){sel.add(new Option('Automatique — le meilleur modèle installé','auto'));
  try{const r=await(await fetch('/api/models')).json();
@@ -692,6 +692,7 @@ function wizard(c){c=c||{};msFound=0;app.innerHTML='<div class="panel" style="ma
    if(ty==='sec'){i=document.createElement('select');for(const[v,n]of[['ssl','SSL/TLS'],['starttls','STARTTLS'],['none','Aucune']])i.add(new Option(n,v))}
   else if(ty==='ai'){i=document.createElement('select');for(const[v,n]of[['ollama','Locale — les mails restent sur ce PC'],['claude','Claude (en ligne, clé API)']])i.add(new Option(n,v))}
   else if(ty==='model'){i=document.createElement('select');fillModels(i,c[k])}
+  else if(ty==='days'){i=document.createElement('input');i.type='number';i.min='1';i.max='7';i.step='1'}
   else{i=document.createElement('input');i.type=ty||'text'}
   i.id='f_'+k;if(ty!=='model'&&c[k])i.value=c[k];w.append(l,i);f.append(w)}
  if(!c.smtp_sec)$('#f_smtp_sec').value='starttls';$('#f_email').onblur=guess;
