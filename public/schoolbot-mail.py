@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.5"
+VERSION = "1.6"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -664,7 +664,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 @media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
-<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button onclick="load()">Traiter mes mails</button></header>
+<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <main id="app"></main>
 <script>
@@ -721,6 +721,8 @@ async function saveIt(){const v=vals();let dl=null;if((v.ollama_model||'').start
  await fetch('/api/config',{method:'POST',body:JSON.stringify(v)});
  if(dl)await fetch('/api/setup',{method:'POST',body:JSON.stringify({model:dl})});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
+async function logout(){if(!confirm('Se déconnecter de ce compte mail ? Vos réglages IA et votre signature seront conservés.'))return;
+ await fetch('/api/logout',{method:'POST',body:'{}'});cfg={};$('#who').textContent='';$('#btnout').style.display='none';wizard({})}
 async function setupScreen(){let s=await(await fetch('/api/setup')).json();if(s.stage==='ready')return true;
  app.innerHTML='<div class="panel"><div class="hero"><div class="orb big pulse"></div><div><h2>Préparation de votre assistant</h2><p id="sm">'+(s.want?'SchoolBot Mail télécharge le modèle <b>'+esc(s.want)+'</b>. Vos mails ne quittent pas cet ordinateur. Selon la connexion, comptez quelques minutes.':'Une seule fois : SchoolBot Mail installe son intelligence artificielle sur cet ordinateur. Vos mails ne le quitteront jamais. Comptez 10 à 20 minutes.')+'</p></div></div><div class="bar"><i id="bar"></i></div><div class="count" id="cnt"></div></div>';
  s=await(await fetch('/api/setup',{method:'POST',body:'{}'})).json();
