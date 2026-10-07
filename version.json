@@ -1,4 +1,4 @@
 {
-  "version": "1.7",
-  "notes": "Aide pour les boites Gmail et installation en un seul clic."
+  "version": "1.8",
+  "notes": "Réglage du nombre de jours de mails à analyser (1 à 7, 2 par défaut)."
 }
