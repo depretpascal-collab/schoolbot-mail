@@ -20,7 +20,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           pyinstaller --onedir --windowed --name "SchoolBot Mail" public/schoolbot-mail.py
-          Compress-Archive -Path "dist/SchoolBot Mail" -DestinationPath SchoolBot-Mail-Windows.zip
+          Compress-Archive -Path "dist/SchoolBot Mail","installer/Installer SchoolBot Mail.bat","installer/LISEZMOI.txt" -DestinationPath SchoolBot-Mail-Windows.zip
       - name: Mac .app
         if: runner.os == 'macOS'
         run: |
