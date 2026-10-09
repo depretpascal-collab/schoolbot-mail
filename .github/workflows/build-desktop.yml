@@ -11,6 +11,8 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,6 +23,25 @@ jobs:
         run: |
           pyinstaller --onedir --windowed --name "SchoolBot Mail" public/schoolbot-mail.py
           pyinstaller --onefile --noconsole --name "Installer SchoolBot Mail" installer/installer.py
+      - name: Signature Educlan Asbl (Azure Artifact Signing)
+        if: runner.os == 'Windows' && env.AZURE_CLIENT_SECRET != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://neu.codesigning.azure.net/
+          trusted-signing-account-name: educlan-signature
+          certificate-profile-name: schoolbot-mail
+          files-folder: dist
+          files-folder-filter: exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Windows .zip
+        if: runner.os == 'Windows'
+        run: |
           Compress-Archive -Path "dist/SchoolBot Mail","dist/Installer SchoolBot Mail.exe","installer/COMMENT INSTALLER.txt" -DestinationPath SchoolBot-Mail-Windows.zip
       - name: Mac .app
         if: runner.os == 'macOS'
