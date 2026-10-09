@@ -1,4 +1,4 @@
 {
-  "version": "1.10",
-  "notes": "Correction de l’écran vide : les réglages et le traitement des mails sont à nouveau accessibles, sans modifier les comptes enregistrés."
+  "version": "1.11",
+  "notes": "Installation plus fiable : corrige l’erreur « Accès refusé » pendant l’installation ou la mise à jour."
 }
