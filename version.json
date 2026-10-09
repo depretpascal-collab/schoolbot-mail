@@ -1,4 +1,4 @@
 {
-  "version": "1.9",
-  "notes": "Le programme se ferme complètement avec sa fenêtre ; la mise à jour ferme l’ancienne version automatiquement."
+  "version": "1.10",
+  "notes": "Correction de l’écran vide : les réglages et le traitement des mails sont à nouveau accessibles, sans modifier les comptes enregistrés."
 }

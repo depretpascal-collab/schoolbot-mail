@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.9"
+VERSION = "1.10"
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -681,7 +681,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 setInterval(()=>fetch('/api/ping').catch(()=>{}),5000);fetch('/api/ping');addEventListener('pagehide',()=>navigator.sendBeacon('/api/bye','{}'));
 const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={},msFound=0;
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
- b.innerHTML='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). '+(u.notes?'<br><small>'+u.notes.replace(/[&<>]/g,'')+'</small><br>':'')+' <a href="'+u.url+'" target="_blank" onclick="setTimeout(()=>{fetch(\'/api/quit\',{method:\'POST\',body:\'{}\'});document.body.innerHTML=\'<p style=&quot;padding:40px;font-size:18px&quot;>SchoolBot Mail est fermé pour permettre la mise à jour. Vous pouvez fermer cette fenêtre.</p>\'},1500)"><b>Télécharger la mise à jour</b></a> · <a href="#" onclick="this.parentNode.remove();return false">Plus tard</a>'}).catch(()=>{});
+ b.textContent='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). ';
+ if(u.notes){b.append(document.createElement('br'));const notes=document.createElement('small');notes.textContent=u.notes;b.append(notes,document.createElement('br'))}
+ const download=document.createElement('a');download.href=u.url;download.target='_blank';download.rel='noopener';download.textContent='Télécharger la mise à jour';
+ download.addEventListener('click',()=>setTimeout(()=>{fetch('/api/quit',{method:'POST',body:'{}'}).catch(()=>{});const message=document.createElement('p');message.textContent='SchoolBot Mail est fermé pour permettre la mise à jour. Vous pouvez fermer cette fenêtre.';document.body.replaceChildren(message)},1500));
+ const later=document.createElement('a');later.href='#';later.textContent='Plus tard';later.addEventListener('click',e=>{e.preventDefault();b.remove()});b.append(download,' · ',later)}).catch(()=>{});
 const CATS={urgent:['Urgent','var(--red)','urgents'],repondre:['À répondre','var(--org)','réponses à rédiger'],transmettre:['À transmettre','var(--blu)','à transmettre'],administratif:['Administratif','var(--yel)','documents à ranger'],info:['À lire','var(--grn)','à lire'],pub:['Pubs & notifications','var(--gry)','pubs et notifications']};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const name=f=>(f||'').replace(/<.*>/,'').replace(/"/g,'').trim()||f;
