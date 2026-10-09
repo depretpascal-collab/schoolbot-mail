@@ -11,6 +11,8 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,8 +25,6 @@ jobs:
           pyinstaller --onefile --noconsole --name "Installer SchoolBot Mail" installer/installer.py
       - name: Signature Educlan Asbl (Azure Artifact Signing)
         if: runner.os == 'Windows' && env.AZURE_CLIENT_SECRET != ''
-        env:
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         uses: azure/trusted-signing-action@v0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
