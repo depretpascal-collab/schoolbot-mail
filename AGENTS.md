@@ -15,3 +15,4 @@
 - Mail content must never leave the user's computer: classification and drafting run against a local model (Ollama). Never route mail text through a cloud API by default — that would make each school use an invisible sub-processor under GDPR.
 - Microsoft 365 mailboxes are reached with the device-code OAuth flow (app registration, no stored password) and Microsoft Graph; IMAP/SMTP with a password stays only as a manual fallback.
 - The single Microsoft client id is a one-time Educlan setup step kept in `MS_CLIENT_ID`; never invent or hardcode a third party's client id.
+- Desktop regression tests live in `tests/` and validate the JavaScript extracted from the evaluated Python PAGE string, because Python escape decoding can break otherwise valid embedded scripts.
