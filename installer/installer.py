@@ -42,7 +42,16 @@ def fermer_ancienne_version():
 
 
 def copier(src, dest):
-    shutil.copytree(src, dest, dirs_exist_ok=True)
+    """Copie avec plusieurs essais (fichiers encore verrouillés quelques secondes)."""
+    import time
+    for essai in range(4):
+        try:
+            shutil.copytree(src, dest, dirs_exist_ok=True)
+            return
+        except OSError:
+            if essai == 3:
+                raise
+            time.sleep(2)
 
 
 def icone_bureau(dest):
@@ -57,7 +66,20 @@ def icone_bureau(dest):
 
 
 def lancer(dest):
-    subprocess.Popen([os.path.join(dest, APP + ".exe")], cwd=dest, creationflags=DETACHED)
+    """Démarre le programme ; réessaie si l'antivirus analyse encore le fichier copié."""
+    import time
+    exe = os.path.join(dest, APP + ".exe")
+    for essai in range(5):
+        try:
+            subprocess.Popen([exe], cwd=dest, creationflags=DETACHED)
+            return True
+        except OSError:
+            time.sleep(2)
+    try:
+        os.startfile(exe)
+        return True
+    except OSError:
+        return False
 
 
 def main():
@@ -84,6 +106,15 @@ def main():
     try:
         copier(src, dest)
     except OSError:
+        # Dossier C:\\SchoolBotMail protégé (créé par un autre compte Windows) : dossier personnel
+        alternatif = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), APP)
+        try:
+            os.makedirs(alternatif, exist_ok=True)
+            copier(src, alternatif)
+            dest = alternatif
+        except OSError:
+            dest = None
+    if dest is None:
         message(
             "SchoolBot Mail est encore ouvert, impossible de l'installer.\n\n"
             "Fermez la fenêtre SchoolBot Mail (bouton croix, ou Gestionnaire des tâches),\n"
@@ -92,7 +123,10 @@ def main():
         )
         return
 
-    icone_bureau(dest)
+    try:
+        icone_bureau(dest)
+    except OSError:
+        pass
     message(
         "Installation terminée !\n\n"
         "Une icône « SchoolBot Mail » a été ajoutée sur votre Bureau.\n"
