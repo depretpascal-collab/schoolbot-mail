@@ -19,7 +19,10 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.11"
+VERSION = "1.12"
+DONATION_URL = "https://educlan.org/adhesion"
+SUPPORT_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "support.json")
+SUPPORT = {"show": False}
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
 GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 
@@ -75,6 +78,32 @@ def save_cfg(c):
 
 
 load_cfg()
+
+
+def save_support(state):
+    os.makedirs(os.path.dirname(SUPPORT_PATH), exist_ok=True)
+    with open(SUPPORT_PATH, "w", encoding="utf-8") as f:
+        json.dump(state, f)
+
+
+def register_support_launch():
+    """Un lancement du programme, jamais un rafraîchissement de sa fenêtre. Tout reste local."""
+    try:
+        with open(SUPPORT_PATH, encoding="utf-8") as f:
+            state = json.load(f)
+        count = max(0, int(state.get("opens", 0))) + 1
+        last = max(0, int(state.get("last_prompt", 0)))
+    except (OSError, ValueError, TypeError, AttributeError):
+        state, count, last = {}, 1, 0
+    due = not last or state.get("version") != VERSION or count - last >= 10
+    if due:
+        last = count
+    state.update(opens=count, last_prompt=last, version=VERSION)
+    try:
+        save_support(state)
+    except OSError:
+        pass  # Un appel aux dons ne doit jamais empêcher le programme de démarrer.
+    SUPPORT["show"] = due
 
 
 def imap_connect(c=None):
@@ -672,14 +701,44 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.35);bo
 .msbox{margin:18px 0;padding:18px;border-radius:16px;background:linear-gradient(160deg,#eef4ff,#fdf6e7);border:1px solid #c7d8f8}
 .code{font-size:26px;font-weight:800;letter-spacing:.16em;color:var(--ac2)}
 @media(max-width:850px){.layout,.split,.grid2{grid-template-columns:1fr}}
+header{flex-wrap:wrap}.brand{min-width:240px;flex-wrap:wrap}
+.donate{background:var(--amber);color:var(--fg);box-shadow:none;white-space:nowrap}
+.donate:hover{background:var(--yel);color:var(--card)}
+.support-note{margin:0;padding:8px 24px;border-bottom:1px solid var(--bd);color:var(--mut);font-size:13px;text-align:center}
+.support-note a{color:var(--ac)}
+#support{max-width:1100px;margin:22px auto 0;padding:0 24px}
+#support[hidden]{display:none}
+.support-content{position:relative;padding:24px;border:1px solid var(--amber);border-left:5px solid var(--amber);border-radius:8px;background:var(--card)}
+.support-content h2{margin:8px 32px 12px 0;font-size:24px;line-height:1.3}
+.support-content p{max-width:760px;margin:10px 0}
+.support-kicker{display:block;padding-right:36px;color:var(--ac);font-weight:700;font-size:13px}
+.support-close{position:absolute;top:12px;right:12px;padding:4px 10px;font-size:22px}
+.support-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.support-freedom{color:var(--mut);font-size:12px}
+@media(max-width:600px){header{padding:12px;gap:8px}.brand{flex-basis:100%}header button{padding:8px 10px;font-size:13px}#who{overflow-wrap:anywhere}#support{padding:0 12px}.support-content{padding:18px}.support-content h2{font-size:22px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
-<span id="who"></span><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
+<span id="who"></span><button class="donate" onclick="donate()">♥ Faire un don</button><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
+<p class="support-note">Gratuit grâce aux dons : vous permettez à Educlan Asbl de développer et d’innover pour l’éducation.</p>
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
+<section id="support" hidden aria-labelledby="support-title"><div class="support-content">
+<button class="g support-close" aria-label="Fermer l’appel aux dons" onclick="dismissSupport()">×</button>
+<span class="support-kicker">DÉVELOPPÉ PAR EDUCLAN ASBL · SOUTENU PAR VOS DONS</span>
+<h2 id="support-title">Le temps que vous gagnez peut faire grandir un projet solidaire.</h2>
+<p>SchoolBot Mail vous aide au quotidien, gratuitement. Derrière cet outil, <strong>Educlan Asbl agit pour une éducation numérique éthique et accessible à tous</strong>, avec des outils respectueux des données personnelles.</p>
+<p><strong>Cette gratuité est possible grâce aux dons.</strong> Votre soutien permet à Educlan de développer, d’améliorer ses outils et d’innover pour l’éducation.</p>
+<p>Si SchoolBot Mail vous rend service, faites un don aujourd’hui : <strong>vous contribuez à la suite de cette aventure et à des outils utiles aux équipes éducatives.</strong></p>
+<div class="support-actions"><button class="donate" onclick="donate()">♥ Faire un don à Educlan</button><button class="g" onclick="dismissSupport()">Continuer sans donner</button></div>
+<p class="support-freedom">Le don est libre. Avec ou sans don, toutes les fonctions restent accessibles. Merci pour votre soutien.</p>
+</div></section>
 <main id="app"></main>
 <script>
 setInterval(()=>fetch('/api/ping').catch(()=>{}),5000);fetch('/api/ping');addEventListener('pagehide',()=>navigator.sendBeacon('/api/bye','{}'));
 const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,filter=null,cfg={},msFound=0;
+fetch('/api/support').then(r=>r.json()).then(s=>{$('#support').hidden=!s.show}).catch(()=>{});
+function dismissSupport(){$('#support').hidden=true;fetch('/api/support/dismiss',{method:'POST',body:'{}'}).catch(()=>{})}
+async function donate(){try{const r=await fetch('/api/support/donate',{method:'POST',body:'{}'});if(!r.ok)throw new Error();}catch(e){alert('La page de dons est accessible sur https://educlan.org/adhesion.')}}
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
  b.textContent='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). ';
  if(u.notes){b.append(document.createElement('br'));const notes=document.createElement('small');notes.textContent=u.notes;b.append(notes,document.createElement('br'))}
@@ -962,6 +1021,8 @@ class H(BaseHTTPRequestHandler):
             return self.reply({"models": ollama_models(), "recommended": pick_model()})
         if self.path == "/api/update":
             return self.reply(check_update())
+        if self.path == "/api/support":
+            return self.reply(SUPPORT)
         if self.path == "/api/ms/status":
             return self.reply(ms_public())
         if self.path == "/api/mails":
@@ -985,6 +1046,13 @@ class H(BaseHTTPRequestHandler):
             threading.Timer(0.5, lambda: os._exit(0)).start()
             return
         try:
+            if self.path == "/api/support/dismiss":
+                SUPPORT["show"] = False
+                return self.reply({"ok": True})
+            if self.path == "/api/support/donate":
+                import webbrowser
+                opened = webbrowser.open(DONATION_URL)
+                return self.reply({"ok": opened}, 200 if opened else 500)
             if self.path == "/api/setup":
                 want = (p.get("model") or "").strip() or None
                 if SETUP["stage"] in ("idle", "error") or (want and SETUP["stage"] == "ready"):
@@ -1060,6 +1128,7 @@ if __name__ == "__main__":
         srv = ThreadingHTTPServer(("127.0.0.1", 8765), H)
     except OSError:  # déjà lancé : on rouvre simplement la fenêtre
         import webbrowser; webbrowser.open(URL); sys.exit(0)
+    register_support_launch()
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     desktop_shortcut()
     print("SchoolBot Mail → " + URL)

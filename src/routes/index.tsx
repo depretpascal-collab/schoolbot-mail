@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Heart } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,6 +26,15 @@ const steps = [
 function Index() {
   return (
     <main className="min-h-screen bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
+          <span className="text-sm font-semibold">SchoolBot Mail</span>
+          <Button asChild variant="outline">
+            <a href="https://educlan.org/adhesion" target="_blank" rel="noopener noreferrer"><Heart aria-hidden="true" />Faire un don</a>
+          </Button>
+        </div>
+      </header>
+      <p className="border-b bg-muted px-6 py-3 text-center text-sm text-muted-foreground">Gratuit grâce aux dons qui permettent à Educlan Asbl de développer et d’innover pour l’éducation.</p>
       <section className="mx-auto max-w-3xl px-6 py-20">
         <p className="text-sm text-muted-foreground">Développé par Educlan Asbl</p>
         <h1 className="mt-2 text-4xl font-bold tracking-tight">SchoolBot Mail</h1>
