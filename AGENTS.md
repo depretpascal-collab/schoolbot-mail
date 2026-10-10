@@ -17,3 +17,4 @@
 - The single Microsoft client id is a one-time Educlan setup step kept in `MS_CLIENT_ID`; never invent or hardcode a third party's client id.
 - Desktop regression tests live in `tests/` and validate the JavaScript extracted from the evaluated Python PAGE string, because Python escape decoding can break otherwise valid embedded scripts.
 - Windows executables are signed in the GitHub build via Azure Artifact Signing, and only when the AZURE_* repository secrets exist; without them the build stays unsigned so releases never break.
+- Donation reminders use a separate local support state file and count process starts after binding the app port; this preserves mailbox settings and avoids counting page refreshes. Open the fixed donation page in the system browser so the desktop webview never handles payments or sends mailbox data.

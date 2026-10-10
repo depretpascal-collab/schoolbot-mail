@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -34,6 +35,52 @@ class DesktopRegressionTests(unittest.TestCase):
             self.app.CFG = {}
             self.app.load_cfg()
             self.assertEqual(self.app.CFG, saved)
+
+    def support_storage(self, folder):
+        self.app.SUPPORT_PATH = str(pathlib.Path(folder) / "support.json")
+
+    def test_support_on_first_launch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.support_storage(folder)
+            self.app.register_support_launch()
+            self.assertTrue(self.app.SUPPORT["show"])
+
+    def test_support_every_ten_further_launches(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.support_storage(folder)
+            self.app.register_support_launch()
+            for cycle in range(2):
+                for opening in range(9):
+                    self.app.register_support_launch()
+                    self.assertFalse(self.app.SUPPORT["show"], (cycle, opening))
+                self.app.register_support_launch()
+                self.assertTrue(self.app.SUPPORT["show"])
+
+    def test_installed_update_shows_support_and_restarts_interval(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.support_storage(folder)
+            self.app.register_support_launch()
+            self.app.register_support_launch()
+            self.assertFalse(self.app.SUPPORT["show"])
+            self.app.VERSION = "test-next-version"
+            self.app.register_support_launch()
+            self.assertTrue(self.app.SUPPORT["show"])
+            self.app.register_support_launch()
+            self.assertFalse(self.app.SUPPORT["show"])
+
+    def test_support_does_not_change_mail_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.support_storage(folder)
+            self.app.CFG = {"signature": "Test", "days": "2"}
+            self.app.register_support_launch()
+            self.assertEqual(self.app.CFG, {"signature": "Test", "days": "2"})
+
+    def test_support_storage_failure_does_not_block_launch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.support_storage(folder)
+            with patch.object(self.app, "save_support", side_effect=OSError("read only")):
+                self.app.register_support_launch()
+            self.assertTrue(self.app.SUPPORT["show"])
 
 
 if __name__ == "__main__":
