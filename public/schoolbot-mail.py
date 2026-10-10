@@ -711,7 +711,7 @@ header{flex-wrap:wrap}.brand{min-width:240px;flex-wrap:wrap}
 .support-content{position:relative;padding:24px;border:1px solid var(--amber);border-left:5px solid var(--amber);border-radius:8px;background:var(--card)}
 .support-content h2{margin:8px 32px 12px 0;font-size:24px;line-height:1.3}
 .support-content p{max-width:760px;margin:10px 0}
-.support-kicker{color:var(--ac);font-weight:700;font-size:13px}
+.support-kicker{display:block;padding-right:36px;color:var(--ac);font-weight:700;font-size:13px}
 .support-close{position:absolute;top:12px;right:12px;padding:4px 10px;font-size:22px}
 .support-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
 .support-freedom{color:var(--mut);font-size:12px}
