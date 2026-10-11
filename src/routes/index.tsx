@@ -27,8 +27,8 @@ function Index() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
-          <span className="text-sm font-semibold">SchoolBot Mail</span>
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <span className="whitespace-nowrap text-sm font-semibold">SchoolBot Mail</span>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button asChild variant="outline" size="sm">
               <a href="https://schoolbot.be" target="_blank" rel="noopener noreferrer">SchoolBot.be</a>
