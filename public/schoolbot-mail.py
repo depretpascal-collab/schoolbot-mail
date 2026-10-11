@@ -19,8 +19,9 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.12"
+VERSION = "1.13"
 DONATION_URL = "https://educlan.org/adhesion"
+SCHOOLBOT_URL = "https://schoolbot.be"
 SUPPORT_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "support.json")
 SUPPORT = {"show": False}
 # Adresse du dépôt GitHub (ex. "pascal/schoolbot-mail") ; vide = pas de vérification
@@ -719,7 +720,7 @@ header{flex-wrap:wrap}.brand{min-width:240px;flex-wrap:wrap}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <header><div class="brand"><div class="orb"></div>SchoolBot Mail <small>développé par Educlan Asbl</small></div>
-<span id="who"></span><button class="donate" onclick="donate()">♥ Faire un don</button><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
+<span id="who"></span><button class="donate" onclick="donate()">♥ Faire un don</button><button class="g" onclick="schoolbot()">SchoolBot.be</button><button class="g" onclick="gear()">⚙ Réglages</button><button class="g" id="btnout" style="display:none" onclick="logout()">Déconnexion</button><button onclick="load()">Traiter mes mails</button></header>
 <p class="support-note">Gratuit grâce aux dons : vous permettez à Educlan Asbl de développer et d’innover pour l’éducation.</p>
 <div id="upd" style="display:none;margin:10px auto 0;max-width:1100px;padding:12px 16px;border-radius:14px;background:#fff7e6;border:1px solid #f3c56b;font-size:14px"></div>
 <section id="support" hidden aria-labelledby="support-title"><div class="support-content">
@@ -739,6 +740,7 @@ const $=s=>document.querySelector(s);const app=$('#app');let mails=[],cur=null,f
 fetch('/api/support').then(r=>r.json()).then(s=>{$('#support').hidden=!s.show}).catch(()=>{});
 function dismissSupport(){$('#support').hidden=true;fetch('/api/support/dismiss',{method:'POST',body:'{}'}).catch(()=>{})}
 async function donate(){try{const r=await fetch('/api/support/donate',{method:'POST',body:'{}'});if(!r.ok)throw new Error();}catch(e){alert('La page de dons est accessible sur https://educlan.org/adhesion.')}}
+async function schoolbot(){try{const r=await fetch('/api/schoolbot',{method:'POST',body:'{}'});if(!r.ok)throw new Error();}catch(e){alert('Le site est accessible sur https://schoolbot.be.')}}
 fetch('/api/update').then(r=>r.json()).then(u=>{if(!u.available)return;const b=$('#upd');b.style.display='block';
  b.textContent='Une nouvelle version de SchoolBot Mail est disponible ('+u.latest+', vous avez la '+u.current+'). ';
  if(u.notes){b.append(document.createElement('br'));const notes=document.createElement('small');notes.textContent=u.notes;b.append(notes,document.createElement('br'))}
@@ -1052,6 +1054,10 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/support/donate":
                 import webbrowser
                 opened = webbrowser.open(DONATION_URL)
+                return self.reply({"ok": opened}, 200 if opened else 500)
+            if self.path == "/api/schoolbot":
+                import webbrowser
+                opened = webbrowser.open(SCHOOLBOT_URL)
                 return self.reply({"ok": opened}, 200 if opened else 500)
             if self.path == "/api/setup":
                 want = (p.get("model") or "").strip() or None

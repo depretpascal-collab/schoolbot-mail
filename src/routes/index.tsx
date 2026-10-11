@@ -29,9 +29,14 @@ function Index() {
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <span className="text-sm font-semibold">SchoolBot Mail</span>
-          <Button asChild variant="outline">
-            <a href="https://educlan.org/adhesion" target="_blank" rel="noopener noreferrer"><Heart aria-hidden="true" />Faire un don</a>
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button asChild variant="outline" size="sm">
+              <a href="https://schoolbot.be" target="_blank" rel="noopener noreferrer">SchoolBot.be</a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href="https://educlan.org/adhesion" target="_blank" rel="noopener noreferrer"><Heart aria-hidden="true" />Faire un don</a>
+            </Button>
+          </div>
         </div>
       </header>
       <p className="border-b bg-muted px-6 py-3 text-center text-sm text-muted-foreground">Gratuit grâce aux dons qui permettent à Educlan Asbl de développer et d’innover pour l’éducation.</p>
