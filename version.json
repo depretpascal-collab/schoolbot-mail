@@ -1,4 +1,4 @@
 {
-  "version": "1.14",
-  "notes": "Microsoft 365 : le bouton « Tester la connexion » vérifie désormais la connexion Microsoft au lieu de l’ancien accès par mot de passe, et l’enregistrement affiche un message clair en cas de souci."
+  "version": "1.15",
+  "notes": "Microsoft 365 : SchoolBot Mail demande maintenant clairement l'accès à la lecture et à l'envoi des mails. Après la mise à jour, reconnectez-vous une fois avec Microsoft (⚙ Réglages)."
 }

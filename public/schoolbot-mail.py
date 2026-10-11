@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.14"
+VERSION = "1.15"
 DONATION_URL = "https://educlan.org/adhesion"
 SCHOOLBOT_URL = "https://schoolbot.be"
 SUPPORT_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "support.json")
@@ -31,7 +31,9 @@ GITHUB_REPO = "depretpascal-collab/schoolbot-mail"
 # Identifiant de l'application à créer une seule fois dans Microsoft Entra (gratuit).
 # Une fois renseigné ici, tous les utilisateurs en bénéficient sans rien configurer.
 MS_CLIENT_ID = "7659db28-79ec-47b1-b055-a36d3394e682"
-MS_SCOPE = "https://graph.microsoft.com/.default offline_access"
+# Permissions demandées explicitement (et non ".default") : sinon Microsoft ne donne que celles
+# déclarées dans l'inscription de l'application et la boîte répond « ErrorAccessDenied » (403).
+MS_SCOPE = "openid profile email offline_access User.Read Mail.ReadWrite Mail.Send"
 MS_AUTH = "https://login.microsoftonline.com/common/oauth2/v2.0"
 MS_API = "https://graph.microsoft.com/v1.0"
 MS = {"state": "idle", "user_code": "", "url": "", "msg": ""}
@@ -350,6 +352,7 @@ def ms_poll():
         acct = ms_account(r.get("id_token") or "")
         save_cfg({"ms_access": r["access_token"], "ms_refresh": r.get("refresh_token", ""),
                   "ms_expiry": time.time() + int(r.get("expires_in", 3600)),
+                  "ms_scope": MS_SCOPE,
                   "ms_email": acct or CFG.get("email", ""),
                   "email": acct or CFG.get("email", ""), "provider": "microsoft"})
         MS.update(state="ok", msg="Connecté !")
@@ -359,7 +362,8 @@ def ms_poll():
 
 def ms_token():
     """Jeton d'accès en cours de validité, renouvelé en silence si nécessaire."""
-    if CFG.get("ms_access") and time.time() < float(CFG.get("ms_expiry", 0) or 0) - 60:
+    fresh_scope = CFG.get("ms_scope") == MS_SCOPE
+    if fresh_scope and CFG.get("ms_access") and time.time() < float(CFG.get("ms_expiry", 0) or 0) - 60:
         return CFG["ms_access"]
     rt = CFG.get("ms_refresh")
     if not rt:
@@ -369,9 +373,12 @@ def ms_token():
                                        "refresh_token": rt, "scope": MS_SCOPE})
     except urllib.error.HTTPError:
         save_cfg({"ms_access": "", "ms_refresh": "", "ms_expiry": 0})
+        if not fresh_scope:
+            raise RuntimeError("SchoolBot Mail a besoin d'une nouvelle autorisation pour lire et répondre à vos mails : "
+                               "ouvrez ⚙ Réglages et reconnectez-vous avec Microsoft (une seule fois).")
         raise RuntimeError("Microsoft ne reconnaît plus cette session : reconnectez-vous avec votre compte.")
     save_cfg({"ms_access": r["access_token"], "ms_refresh": r.get("refresh_token", rt),
-              "ms_expiry": time.time() + int(r.get("expires_in", 3600))})
+              "ms_expiry": time.time() + int(r.get("expires_in", 3600)), "ms_scope": MS_SCOPE})
     return r["access_token"]
 
 
@@ -386,8 +393,11 @@ def graph(path, method="GET", body=None):
     except urllib.error.HTTPError as e:
         det = e.read().decode("utf-8", "replace")[:250]
         if e.code in (401, 403):
+            save_cfg({"ms_access": "", "ms_expiry": 0})
             raise RuntimeError("Microsoft a refusé l'accès à la boîte (" + str(e.code) + "). "
-                               "Reconnectez-vous avec votre compte (bouton ⚙). Détail : " + det)
+                               "Ouvrez ⚙ Réglages, cliquez « Se déconnecter » puis reconnectez-vous avec Microsoft "
+                               "et acceptez l'accès aux mails. Si l'école bloque cette autorisation, son service "
+                               "informatique doit approuver SchoolBot Mail (éditeur vérifié : Educlan Asbl).")
         raise RuntimeError("Erreur Microsoft 365 (" + str(e.code) + ") : " + det)
     return json.loads(raw) if raw else {}
 
