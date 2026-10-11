@@ -19,7 +19,7 @@ CONF_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "config.json")
 CFG = {}
 
 # Numéro de version : à augmenter à chaque nouvelle version, en même temps que version.json
-VERSION = "1.13"
+VERSION = "1.14"
 DONATION_URL = "https://educlan.org/adhesion"
 SCHOOLBOT_URL = "https://schoolbot.be"
 SUPPORT_PATH = os.path.join(os.path.expanduser("~"), ".mailpilot", "support.json")
@@ -803,7 +803,8 @@ async function msOut(){await fetch('/api/ms/out',{method:'POST',body:'{}'});msFo
 const vals=()=>Object.fromEntries(F.map(([k])=>[k,$('#f_'+k).value]));
 async function testIt(){$('#wst').textContent='Test en cours…';const r=await(await fetch('/api/test',{method:'POST',body:JSON.stringify(vals())})).json();$('#wst').textContent='Réception : '+r.imap+' · Envoi : '+r.smtp}
 async function saveIt(){const v=vals();let dl=null;if((v.ollama_model||'').startsWith('dl:')){dl=v.ollama_model.slice(3);v.ollama_model=dl}
- await fetch('/api/config',{method:'POST',body:JSON.stringify(v)});
+ $('#wst').textContent='Enregistrement…';
+ try{const r=await fetch('/api/config',{method:'POST',body:JSON.stringify(v)});if(!r.ok)throw new Error('code '+r.status)}catch(e){$('#wst').textContent="L'enregistrement a échoué ("+e.message+'). Réessayez.';return}
  if(dl)await fetch('/api/setup',{method:'POST',body:JSON.stringify({model:dl})});load()}
 async function gear(){wizard((await(await fetch('/api/config')).json()).cfg)}
 async function logout(){if(!confirm('Se déconnecter de ce compte mail ? Vos réglages IA et votre signature seront conservés.'))return;
@@ -1074,6 +1075,13 @@ class H(BaseHTTPRequestHandler):
                 MS.update(state="idle", user_code="", msg="")
                 return self.reply({"ok": True})
             if self.path == "/api/test":
+                if is_ms():
+                    try:
+                        graph("/me/mailFolders/inbox?$select=totalItemCount")
+                        return self.reply({"imap": "OK (Microsoft 365)", "smtp": "OK (Microsoft 365)"})
+                    except Exception as e:
+                        msg = "échec (" + str(e)[:160] + ")"
+                        return self.reply({"imap": msg, "smtp": msg})
                 c = dict(CFG)
                 c.update({k: v for k, v in p.items() if v != ""})
                 res = {}
