@@ -91,6 +91,20 @@ class DesktopRegressionTests(unittest.TestCase):
         handler = inspect.getsource(self.app.H.do_POST)
         self.assertRegex(handler, r'"/api/schoolbot"[\s\S]{0,160}webbrowser\.open\(SCHOOLBOT_URL\)')
 
+    def test_microsoft_login_requests_mail_permissions(self):
+        scopes = self.app.MS_SCOPE.split()
+        for needed in ("offline_access", "Mail.ReadWrite", "Mail.Send"):
+            self.assertIn(needed, scopes)
+        self.assertNotIn("https://graph.microsoft.com/.default", scopes)
+
+    def test_old_microsoft_session_is_refreshed_with_mail_permissions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            self.app.CONF_PATH = str(pathlib.Path(folder) / "config.json")
+            self.app.CFG = {"ms_access": "old", "ms_refresh": "rt", "ms_expiry": 9e12}
+            with patch.object(self.app, "_post", return_value={"access_token": "new", "expires_in": 3600}) as post:
+                self.assertEqual(self.app.ms_token(), "new")
+            self.assertEqual(post.call_args[0][1]["scope"], self.app.MS_SCOPE)
+
 
 if __name__ == "__main__":
     unittest.main()
