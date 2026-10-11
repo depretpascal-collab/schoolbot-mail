@@ -1,5 +1,6 @@
 """Run with: python3 -m unittest discover -s tests -v."""
 import importlib.util
+import inspect
 import pathlib
 import subprocess
 import tempfile
@@ -81,6 +82,14 @@ class DesktopRegressionTests(unittest.TestCase):
             with patch.object(self.app, "save_support", side_effect=OSError("read only")):
                 self.app.register_support_launch()
             self.assertTrue(self.app.SUPPORT["show"])
+
+    def test_schoolbot_button_opens_the_fixed_site_in_the_browser(self):
+        self.assertEqual(self.app.SCHOOLBOT_URL, "https://schoolbot.be")
+        script = self.app.PAGE.split("<script>", 1)[1].split("</script>", 1)[0]
+        self.assertIn('onclick="schoolbot()"', self.app.PAGE)
+        self.assertIn("fetch('/api/schoolbot'", script)
+        handler = inspect.getsource(self.app.H.do_POST)
+        self.assertRegex(handler, r'"/api/schoolbot"[\s\S]{0,160}webbrowser\.open\(SCHOOLBOT_URL\)')
 
 
 if __name__ == "__main__":
