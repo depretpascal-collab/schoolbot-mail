@@ -1,4 +1,4 @@
 {
   "version": "1.14",
-  "notes": "Bouton SchoolBot.be dans l'en-tête pour découvrir le projet de l'asbl, en plus du bouton Faire un don. Le programme reste gratuit pour tous."
+  "notes": "Microsoft 365 : le bouton « Tester la connexion » vérifie désormais la connexion Microsoft au lieu de l’ancien accès par mot de passe, et l’enregistrement affiche un message clair en cas de souci."
 }
