@@ -18,3 +18,4 @@
 - Desktop regression tests live in `tests/` and validate the JavaScript extracted from the evaluated Python PAGE string, because Python escape decoding can break otherwise valid embedded scripts.
 - Windows executables are signed in the GitHub build via Azure Artifact Signing, and only when the AZURE_* repository secrets exist; without them the build stays unsigned so releases never break.
 - Donation reminders use a separate local support state file and count process starts after binding the app port; this preserves mailbox settings and avoids counting page refreshes. Open the fixed donation page in the system browser so the desktop webview never handles payments or sends mailbox data.
+- Outbound links from the desktop app (donation page, SchoolBot.be) are fixed constants opened through a dedicated endpoint in the system browser; never let the webview navigate to an external page, so mailbox data and the local session can never leak with it.
