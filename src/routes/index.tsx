@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
+import logoEntete from "@/assets/logo-schoolbot-mail-header.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,7 +29,7 @@ function Index() {
     <main className="min-h-screen bg-background text-foreground">
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <span className="whitespace-nowrap text-sm font-semibold">SchoolBot Mail</span>
+          <img src={logoEntete} alt="SchoolBot Mail" width={1462} height={171} className="h-6 w-auto" />
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button asChild variant="outline" size="sm">
               <a href="https://schoolbot.be" target="_blank" rel="noopener noreferrer">SchoolBot.be</a>
