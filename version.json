@@ -1,4 +1,4 @@
 {
-  "version": "1.15",
-  "notes": "Microsoft 365 : SchoolBot Mail demande maintenant clairement l'accès à la lecture et à l'envoi des mails. Après la mise à jour, reconnectez-vous une fois avec Microsoft (⚙ Réglages)."
+  "version": "1.16",
+  "notes": "Nouveau logo SchoolBot Mail dans l'en-tête de l'assistant, et nouvelle icône pour l'application et l'onglet du navigateur."
 }
